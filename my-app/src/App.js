@@ -302,11 +302,11 @@ const App = () => {
         </div>
       )}
 
-      {/* {aiResponse && (
+      {aiResponse && (
         <div className={`ai-response ${aiResponse ? "show" : ""}`}>
           <strong></strong> {aiResponse}
         </div>
-      )} */}
+      )}
     </div>
   );
 };
