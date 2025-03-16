@@ -1,5 +1,5 @@
 from flask import Flask, request, jsonify
-from flask_cors import CORS
+from flask_cors import CORS  # Import CORS
 import google.generativeai as genai
 from spotipy import Spotify
 from spotipy.oauth2 import SpotifyOAuth
@@ -26,19 +26,15 @@ sp = Spotify(auth_manager=SpotifyOAuth(
     scope="user-modify-playback-state user-read-playback-state user-read-currently-playing"
 ))
 
+# Fetch available devices
 devices = sp.devices()
-# Print the list of devices
-print("Available Devices:")
-# Extract the first available device ID
 if devices.get("devices"):
     device_id = devices["devices"][0]["id"]
-    print(f"\nYour Active Device ID: {device_id}")
+    print(f"\nYour Active Spotify Device ID: {device_id}")
 else:
     print("\nNo active devices found. Please open Spotify and start playing music on a device.")
-    
 
-
-# Store the last 10 queries
+# Initialize deque to store the last 10 messages (query, response pairs)
 message_history = deque(maxlen=10)
 
 def control_music(command):
@@ -70,36 +66,47 @@ def control_music(command):
         return f"Error controlling music: {e}"
 
 def ask_google_assistant(prompt):
-    """Process user query and return AI response or control music if applicable."""
+    """Send a text query to Google Bard API or control music via Spotify."""
     
     # Check if the query is music-related
     if any(word in prompt.lower() for word in ["play", "pause", "next", "previous", "what's playing"]):
         return control_music(prompt)
 
-    # Process with Google AI for other queries
-    model = genai.GenerativeModel("gemini-1.5-flash")
+    # Combine conversation history into a single string
+    history_text = "\n".join([f"User: {msg['query']}\nAssistant: {msg['response']}" for msg in message_history])
+
+    simplified_prompt = (
+        "Please provide a simple and easy-to-understand response to the following question. Also, avoid using markdowns such as bullet points, numbering, or special characters. "
+        "Avoid complex terms, use everyday language, and provide clear and short sentences. "
+        "Make it sound natural and easy for anyone to understand. Here is the conversation history:\n" + history_text + "\nQuestion: " + prompt
+    )
+
+    model = genai.GenerativeModel("gemini-1.5-flash")  # Corrected model name
+
     try:
-        response = model.generate_content(prompt)
+        response = model.generate_content(simplified_prompt)
         return response.text if response else "Sorry, I didn't understand."
     except Exception as e:
-        return f"AI Error: {e}"
+        print(f"Error occurred: {e}")
+        return "Sorry, I couldn't process your request."
 
 @app.route('/ask', methods=['POST'])
 def ask():
-    """API endpoint to get AI response."""
-    data = request.get_json()
+    """API endpoint to get AI response or control music."""
+    data = request.get_json()  # Get JSON data from the request
     if 'query' not in data:
         return jsonify({'error': 'Query is required'}), 400
 
     user_query = data['query']
     print(f"Received query: {user_query}")
 
-    # Get response from AI or control music
+    # Get the response from the AI model or control music
     response_text = ask_google_assistant(user_query)
 
-    # Store query history
+    # Add the query and response to the message history
     message_history.append({'query': user_query, 'response': response_text})
 
+    # Return the response
     return jsonify({'response': response_text, 'history': list(message_history)})
 
 if __name__ == "__main__":

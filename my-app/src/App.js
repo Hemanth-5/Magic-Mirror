@@ -14,11 +14,13 @@ const App = () => {
   const [isListening, setIsListening] = useState(false);
   const [speechText, setSpeechText] = useState("");
   const [aiResponse, setAiResponse] = useState("");
-  const [isActivated, setIsActivated] = useState(false); // Track activation status
+  const [isActivated, setIsActivated] = useState(false); // Track activation
+  const [hasActivated, setHasActivated] = useState(false); // Track first activation
+  const [praise, setPraise] = useState(""); // Random praise message
 
   const canvasRef = useRef(null); // Ref for Analog Clock
 
-  const magicMirrorName = "alexa"; // Set the name of the Magic Mirror
+  const magicMirrorName = "magic"; // Set the name of the Magic Mirror
 
   const updateTime = () => {
     const now = new Date();
@@ -39,40 +41,61 @@ const App = () => {
   const speak = (text) => {
     const synth = window.speechSynthesis;
 
+    // Cancel any ongoing speech to allow interruption
     if (synth.speaking) {
+      console.log("Interrupting ongoing speech...");
       synth.cancel();
     }
 
-    const utterance = new SpeechSynthesisUtterance(text);
-    utterance.lang = "en-US";
-    utterance.rate = 1;
-    utterance.pitch = 1;
+    // Ensure voices are ready
+    if (synth.getVoices().length === 0) {
+      console.error("Speech Synthesis voices are not ready yet.");
+      setTimeout(() => speak(text), 1000);
+      return;
+    }
 
-    utterance.onend = () => {
-      console.log("Speech finished completely");
+    // Split text into smaller sentences if needed
+    const sentences = text.match(/[^.!?]+[.!?]/g) || [text];
+
+    const speakSentence = (index = 0) => {
+      if (index >= sentences.length) return; // Stop if done
+
+      const utterance = new SpeechSynthesisUtterance(sentences[index].trim());
+      utterance.lang = "en-US";
+      utterance.rate = 1;
+      utterance.pitch = 1;
+
+      utterance.onend = () => {
+        console.log("Speech finished:", sentences[index]);
+        speakSentence(index + 1);
+      };
+
+      utterance.onerror = (e) => {
+        console.error("Speech error: ", e);
+      };
+
+      synth.speak(utterance);
     };
 
-    utterance.onerror = (e) => {
-      console.error("Speech error: ", e);
-    };
-
-    synth.speak(utterance);
+    speakSentence(); // Start speaking
   };
 
   const typeWriter = (text, setText) => {
+    console.log("Typing: ", text);
     let i = 0;
-    setText(text[i]);
-
-    speak(text);
+    let typedText = ""; // Accumulate the text
 
     const interval = setInterval(() => {
       if (i < text.length) {
-        setText((prev) => prev + text[i]);
+        typedText += text.charAt(i); // Accumulate text
+        setText(typedText); // Update state once with the accumulated text
         i++;
       } else {
         clearInterval(interval);
       }
     }, 50);
+
+    speak(text); // Speak after starting the typewriter effect
   };
 
   const sendToApi = async (query) => {
@@ -89,7 +112,7 @@ const App = () => {
       const aiMessage =
         data.response || data.message || "Sorry, no response received.";
 
-      console.log(aiMessage);
+      // console.log(aiMessage);
       setAiResponse(aiMessage);
 
       typeWriter(aiMessage, setAiResponse);
@@ -112,8 +135,8 @@ const App = () => {
     } else {
       recognition.start();
       setIsListening(true);
-      setSpeechText("");
-      setAiResponse("");
+      setSpeechText(""); // Clear speech text when starting new listening session
+      setAiResponse(""); // Clear AI response
     }
   };
 
@@ -125,15 +148,25 @@ const App = () => {
     }
     setSpeechText(finalTranscript);
 
+    // Check if the speech contains the activation phrase "magic"
     if (finalTranscript.toLowerCase().includes(magicMirrorName.toLowerCase())) {
-      // Activate the magic mirror when the name is detected
-      setIsActivated(true);
-      speak("Hello! I'm activated and ready to listen.");
-      setIsListening(true); // Continue listening after activation
+      if (!isActivated) {
+        // If it's the first time, activate and stop further processing
+        setIsActivated(true);
+        setHasActivated(true); // First activation
+        speak("Hello! I'm activated and ready to listen.");
+        return; // Prevent processing the query if it's just the activation phrase
+      }
     }
 
-    if (isActivated && event.results[event.results.length - 1].isFinal) {
-      sendToApi(finalTranscript);
+    // Only process non-activation input after activation
+    if (
+      isActivated &&
+      hasActivated &&
+      event.results[event.results.length - 1].isFinal &&
+      !finalTranscript.toLowerCase().includes(magicMirrorName.toLowerCase()) // Ensure it's not the activation phrase
+    ) {
+      sendToApi(finalTranscript); // Send the query to AI if it's not the activation phrase
     }
   };
 
@@ -206,11 +239,42 @@ const App = () => {
     return () => clearInterval(interval);
   }, []);
 
+  const praises = [
+    "You’re looking radiant today!",
+    "That outfit looks fantastic on you!",
+    "Your smile is absolutely glowing.",
+    "Your confidence is shining through.",
+    "You look stunning as always.",
+    "Your eyes are sparkling today!",
+    "That look is on point. You’re rocking it!",
+    "Your hair looks amazing—did you do something new?",
+    "You’ve got that perfect glow today.",
+    "You’re looking sharp and stylish.",
+    "You have a natural elegance about you.",
+    "Your energy and style are so captivating.",
+    "You’ve got that glow-up feeling today!",
+    "Everything about your look is flawless.",
+    "Your posture is perfect—own it!",
+    "You look ready to take on the world!",
+    "That color looks amazing on you.",
+    "You make this look effortless—pure class.",
+    "Your skin is glowing—looking healthy and refreshed.",
+    "You’re looking more confident with every day!",
+  ];
+
+  useEffect(() => {
+    const randomPraise = praises[Math.floor(Math.random() * praises.length)];
+    setPraise(". . .");
+    setTimeout(() => {
+      setPraise(randomPraise);
+    }, 5000);
+  }, []);
+
   return (
     <div className="App">
       <h1>
         <div className="praise">
-          {isActivated ? "How can I assist you?" : "Say my name to activate."}
+          {isActivated ? praise : "Say my name to activate."}
         </div>
       </h1>
       <div className="info-widget">
@@ -238,11 +302,11 @@ const App = () => {
         </div>
       )}
 
-      {aiResponse && (
+      {/* {aiResponse && (
         <div className={`ai-response ${aiResponse ? "show" : ""}`}>
           <strong></strong> {aiResponse}
         </div>
-      )}
+      )} */}
     </div>
   );
 };
