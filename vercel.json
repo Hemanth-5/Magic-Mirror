@@ -1,8 +1,5 @@
 {
   "version": 2,
-  "framework": "create-react-app",
-  "buildCommand": "cd my-app && npm run build",
-  "outputDirectory": "my-app/build",
   "builds": [
     {
       "src": "api/**/*.py",
@@ -12,7 +9,7 @@
       "src": "my-app/package.json",
       "use": "@vercel/static-build",
       "config": {
-        "distDir": "my-app/build"
+        "distDir": "build"
       }
     }
   ],
