@@ -30,7 +30,7 @@ SPOTIFY_REDIRECT_URI = os.environ.get("SPOTIFY_REDIRECT_URI", "http://localhost:
 
 if not all([API_KEY, SPOTIFY_CLIENT_ID, SPOTIFY_CLIENT_SECRET]):
     print("❗ One or more environment variables are missing.")
-    
+
 
 # Initialize Spotipy client with authentication
 sp = Spotify(auth_manager=SpotifyOAuth(
@@ -1235,6 +1235,3 @@ def home():
 
 # if __name__ == "__main__":
 #     app.run(debug=True, host='0.0.0.0', port=5000)
-
-def handler(request, start_response):
-    return app.wsgi_app(request.environ, start_response)
