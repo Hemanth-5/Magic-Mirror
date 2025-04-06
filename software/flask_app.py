@@ -8,9 +8,14 @@ import json
 import re
 import datetime
 import random
+import os
+from dotenv import load_dotenv
+
+# Load environment variables from .env file
+load_dotenv()
 
 # Configure Google AI
-API_KEY = "AIzaSyCyAUf1hgB3K6abvs5fuC2kQCk_NZToU8w"
+API_KEY = os.environ.get("GOOGLE_API_KEY", "")
 genai.configure(api_key=API_KEY)
 model = genai.GenerativeModel("gemini-1.5-flash")
 
@@ -19,9 +24,9 @@ app = Flask(__name__)
 CORS(app, resources={r"/*": {"origins": "*"}})  # For development only
 
 # Spotify API credentials
-SPOTIFY_CLIENT_ID = "5b16824dcbf343059c84eb7ad962f790"
-SPOTIFY_CLIENT_SECRET = "ba870b57e9bf49a085f750b482836ad8"
-SPOTIFY_REDIRECT_URI = "http://localhost:8888/callback"
+SPOTIFY_CLIENT_ID = os.environ.get("SPOTIFY_CLIENT_ID", "")
+SPOTIFY_CLIENT_SECRET = os.environ.get("SPOTIFY_CLIENT_SECRET", "")
+SPOTIFY_REDIRECT_URI = os.environ.get("SPOTIFY_REDIRECT_URI", "http://localhost:8888/callback")
 
 # Initialize Spotipy client with authentication
 sp = Spotify(auth_manager=SpotifyOAuth(

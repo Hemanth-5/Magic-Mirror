@@ -3,6 +3,7 @@ import json
 import datetime
 import google.generativeai as genai
 import os
+import random
 
 # Configure Google AI
 API_KEY = os.environ.get("GOOGLE_API_KEY", "")
@@ -32,7 +33,6 @@ class handler(BaseHTTPRequestHandler):
             
             # Mock weather data
             weather_conditions = ["Sunny", "Cloudy", "Rainy", "Partly Cloudy", "Clear"]
-            import random
             weather = {
                 "condition": random.choice(weather_conditions),
                 "temperature": random.randint(15, 30),
@@ -74,16 +74,21 @@ class handler(BaseHTTPRequestHandler):
             
             user_query = data['query']
             
-            if API_KEY and 'gemini' in genai.__name__:
-                try:
-                    # Use Gemini for response
-                    ai_response = model.generate_content(user_query)
-                    response_text = ai_response.text
-                except Exception as e:
-                    response_text = f"AI service error: {str(e)}"
-            else:
-                # Fallback response if API key not configured
-                response_text = f"I received your query: '{user_query}', but AI service is not configured."
+            try:
+                # Create a simplified prompt for the mirror
+                simplified_prompt = (
+                    "Imagine you are a magic mirror. You reflect the questions asked of you and offer answers in a clear, simple, and easy-to-understand way. "
+                    "Avoid using complex words, bullet points, or special characters. Keep your responses short and sweet, so they are easy for anyone to understand. "
+                    "You provide simple, natural answers as though you are a mirror reflecting the world around you. Don't make the answers too long. "
+                    "Also, don't explicity say 'I am a mirror' or 'I reflect'. Just reflect the user's query in your response. "
+                    "User's Question: " + user_query + "\nYour Response:"
+                )
+                
+                # Use Gemini for response
+                ai_response = model.generate_content(simplified_prompt)
+                response_text = ai_response.text
+            except Exception as e:
+                response_text = f"I see you asked '{user_query}', but my reflection is cloudy at the moment. Try again later."
             
             response = {'response': response_text}
         else:
