@@ -1,4 +1,4 @@
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, redirect
 from flask_cors import CORS  # Import CORS
 import google.generativeai as genai
 from spotipy import Spotify
@@ -37,7 +37,7 @@ sp = None
 # Step 1: Redirect user to Spotify login
 @app.route("/")
 def login():
-    scope = "user-read-playback-state"
+    scope = "user-read-playback-state user-modify-playback-state"
     auth_url = (
         "https://accounts.spotify.com/authorize"
         "?response_type=code"
@@ -76,12 +76,15 @@ def callback():
 
     tokens = response.json()
     access_token = tokens["access_token"]
-    # refresh_token = tokens["refresh_token"]  # Optional, store it if needed
 
-    # Create authenticated Spotify client
+    # Initialize the Spotify client with the access token
     sp = Spotify(auth=access_token)
 
-    return "Login successful! You can now access /devices."
+    # Get the frontend URL - handle different environments
+    frontend_url = os.environ.get("FRONTEND_URL", "http://localhost:3000")
+    
+    # Redirect back to the frontend with token
+    return redirect(f"{frontend_url}?token={access_token}")
 
 # Remove the global initialization of the Spotify client and devices fetching logic
 sp = None
