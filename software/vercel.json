@@ -2,14 +2,14 @@
     "version": 2,
     "builds": [
       {
-        "src": "software/flask_app.py",
+        "src": "lask_app.py",
         "use": "@vercel/python"
       }
     ],
     "routes": [
       {
         "src": "/(.*)",
-        "dest": "software/flask_app.py"
+        "dest": "lask_app.py"
       }
     ]
   }
