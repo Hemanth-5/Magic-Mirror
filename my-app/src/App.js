@@ -362,6 +362,12 @@ const App = () => {
     };
   }, []);
 
+  // Add logic to handle Spotify login redirection
+  const handleSpotifyLoginRedirect = () => {
+    const API_URL = process.env.REACT_APP_API_URL || window.location.origin;
+    window.location.href = `${API_URL}/login`; // Redirect to backend login endpoint
+  };
+
   return (
     <div className="App">
       <div style={displayStyle}>
@@ -404,7 +410,7 @@ const App = () => {
 
         {showMusicPlayer && (
           <div className="spotify-container">
-            <SpotifyPlayer onPlayerStateChange={setSpotifyPlayerState} />
+            <SpotifyPlayer onPlayerStateChange={setSpotifyPlayerState} onLoginRedirect={handleSpotifyLoginRedirect} />
           </div>
         )}
 

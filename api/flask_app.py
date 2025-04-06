@@ -83,22 +83,21 @@ def callback():
 
     return "Login successful! You can now access /devices."
 
-# Initialize Spotipy client with authentication
-sp = Spotify(auth_manager=SpotifyOAuth(
-    client_id=SPOTIFY_CLIENT_ID,
-    client_secret=SPOTIFY_CLIENT_SECRET,
-    redirect_uri=SPOTIFY_REDIRECT_URI,
-    scope="user-modify-playback-state user-read-playback-state user-read-currently-playing streaming"
-))
+# Remove the global initialization of the Spotify client and devices fetching logic
+sp = None
 
+# Add a route to fetch devices dynamically
+@app.route("/devices")
+def get_devices():
+    global sp
+    if not sp:
+        return "Spotify client is not initialized. Please authenticate first.", 401
 
-# Fetch available devices
-devices = sp.devices()
-if devices.get("devices"):
-    device_id = devices["devices"][0]["id"]
-    print(f"\nYour Active Spotify Device ID: {device_id}")
-else:
-    print("\nNo active devices found. Please open Spotify and start playing music on a device.")
+    try:
+        devices = sp.devices()
+        return jsonify(devices)
+    except Exception as e:
+        return f"Error fetching devices: {str(e)}", 500
 
 # Initialize deque to store the last 10 messages (query, response pairs)
 message_history = deque(maxlen=10)

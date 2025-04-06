@@ -271,6 +271,25 @@ const SpotifyPlayer = ({ onPlayerStateChange }) => {
       player.seek(newPosition * 1000);
     }
   };
+
+  // Add a button to redirect to Spotify login
+  const handleSpotifyLogin = () => {
+    const API_URL = process.env.REACT_APP_API_URL || window.location.origin;
+    window.location.href = `${API_URL}/login`; // Redirect to backend login endpoint
+  };
+
+  // Add a login button when the player is inactive
+  if (!isActive && !isVercelEnv) {
+    return (
+      <div className="spotify-player inactive">
+        <div className="player-status">
+          <p>Spotify player is initializing...</p>
+          <p className="small">Please open the Spotify app on your device to help with connection.</p>
+          <button onClick={handleSpotifyLogin} className="login-button">Login to Spotify</button>
+        </div>
+      </div>
+    );
+  }
   
   if (error && !isVercelEnv) {
     return (
