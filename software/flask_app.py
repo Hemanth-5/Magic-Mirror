@@ -1225,5 +1225,9 @@ def get_ai_response_for_music_query(user_query):
     response = get_gemini_response(prompt)
     return response
 
-if __name__ == "__main__":
-    app.run(debug=True, host='0.0.0.0', port=5000)
+# if __name__ == "__main__":
+#     app.run(debug=True, host='0.0.0.0', port=5000)
+
+def handler(request, start_response):
+    return app.wsgi_app(request.environ, start_response)
+
