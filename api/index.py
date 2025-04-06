@@ -35,7 +35,7 @@ if not all([API_KEY, SPOTIFY_CLIENT_ID, SPOTIFY_CLIENT_SECRET]):
 sp = None
 
 # Step 1: Redirect user to Spotify login
-@app.route("/")
+@app.route("/login")
 def login():
     scope = "user-read-playback-state user-modify-playback-state"
     auth_url = (
