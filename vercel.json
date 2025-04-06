@@ -3,13 +3,21 @@
   "framework": "create-react-app",
   "buildCommand": "cd my-app && npm run build",
   "outputDirectory": "my-app/build",
-  "functions": {
-    "api/*.py": {
-      "runtime": "python3.9"
+  "builds": [
+    {
+      "src": "api/**/*.py",
+      "use": "@vercel/python@1.3.0"
+    },
+    {
+      "src": "my-app/package.json",
+      "use": "@vercel/static-build@1.0.0",
+      "config": {
+        "distDir": "my-app/build"
+      }
     }
-  },
+  ],
   "routes": [
-    { "src": "/api/(.*)", "dest": "/api/$1" },
+    { "src": "/api/(.*)", "dest": "/api/$1.py" },
     { "handle": "filesystem" },
     { "src": "/(.*)", "dest": "/my-app/build/index.html" }
   ]
