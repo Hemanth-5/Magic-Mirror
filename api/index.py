@@ -1283,6 +1283,21 @@ def get_ai_response_for_music_query(user_query):
     response = get_gemini_response(prompt)
     return response
 
+@app.route("/")
+def home():
+    # A simple html for Magic mirror
+    return """
+    <html>
+        <head>
+            <title>Magic Mirror</title>
+        </head>
+        <body>
+            <h1>Welcome to the Magic Mirror!</h1>
+            <p>This is a placeholder for the magic mirror interface.</p>
+        </body>
+    </html>
+    """
+
 if __name__ == "__main__":
     app.run(host='0.0.0.0', port=5000)
 
