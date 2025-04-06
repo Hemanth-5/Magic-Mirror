@@ -1,0 +1,16 @@
+{
+  "version": 2,
+  "framework": "create-react-app",
+  "buildCommand": "cd my-app && npm run build",
+  "outputDirectory": "my-app/build",
+  "functions": {
+    "api/*.py": {
+      "runtime": "python3.9"
+    }
+  },
+  "routes": [
+    { "src": "/api/(.*)", "dest": "/api/$1" },
+    { "handle": "filesystem" },
+    { "src": "/(.*)", "dest": "/my-app/build/index.html" }
+  ]
+}

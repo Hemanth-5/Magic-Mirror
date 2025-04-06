@@ -131,7 +131,7 @@ body {
   background: rgba(255, 255, 255, 0.2);
 }
 
-strong {
+.ai-response.show strong {
   font-weight: 600;
   color: white;
 }
@@ -162,4 +162,125 @@ strong {
   position: absolute;
   top: 20px;
   right: 20px;
+}
+
+/* Text input styling */
+.input-form {
+  display: flex;
+  gap: 10px;
+  width: 100%;
+  max-width: 600px;
+  margin: 20px 0;
+}
+
+.text-input {
+  flex: 1;
+  background: rgba(255, 255, 255, 0.2);
+  border: none;
+  border-radius: 25px;
+  padding: 15px 25px;
+  font-size: 1.1rem;
+  color: white;
+  backdrop-filter: blur(10px);
+  box-shadow: 0 0 10px rgba(0, 0, 0, 0.4);
+  transition: all 0.3s ease;
+}
+
+.text-input:focus {
+  outline: none;
+  box-shadow: 0 0 15px rgba(255, 255, 255, 0.5);
+  background: rgba(255, 255, 255, 0.25);
+}
+
+.text-input::placeholder {
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.submit-btn {
+  background: rgba(255, 255, 255, 0.2);
+  border: none;
+  border-radius: 25px;
+  padding: 0 25px;
+  color: white;
+  font-size: 1rem;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  backdrop-filter: blur(10px);
+}
+
+.submit-btn:hover {
+  background: rgba(255, 255, 255, 0.3);
+  box-shadow: 0 0 15px rgba(255, 255, 255, 0.4);
+}
+
+.submit-btn:active {
+  transform: scale(0.98);
+}
+
+.music-control-btn {
+  background: #1db954;
+  border: none;
+  color: white;
+  padding: 8px 16px;
+  border-radius: 20px;
+  margin-top: 10px;
+  cursor: pointer;
+  font-size: 16px;
+  transition: all 0.2s;
+}
+
+.music-control-btn:hover {
+  background: #1ed760;
+  transform: scale(1.05);
+}
+
+.spotify-container {
+  width: 100%;
+  max-width: 400px;
+  margin: 20px auto;
+}
+
+/* Data Widget Styles */
+.data-widget {
+  background-color: rgba(0, 0, 0, 0.4);
+  border-radius: 10px;
+  padding: 12px 20px;
+  margin: 20px 0;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  backdrop-filter: blur(5px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  max-width: 300px;
+  width: 100%;
+  text-align: center;
+}
+
+.data-item {
+  margin: 8px 0;
+  font-size: 1.2rem;
+  letter-spacing: 0.5px;
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.5);
+}
+
+.data-item.weather {
+  color: #64b5f6;
+  font-weight: 500;
+}
+
+.data-item.time {
+  color: #81c784;
+  font-weight: 500;
+}
+
+.loading-text {
+  color: rgba(255, 255, 255, 0.6);
+  font-style: italic;
+  font-size: 1rem;
+  margin: 20px 0;
+  animation: pulse 1.5s infinite;
+}
+
+@keyframes pulse {
+  0% { opacity: 0.6; }
+  50% { opacity: 1; }
+  100% { opacity: 0.6; }
 }

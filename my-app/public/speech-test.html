@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Speech Synthesis Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            line-height: 1.6;
+        }
+        button {
+            background-color: #4CAF50;
+            border: none;
+            color: white;
+            padding: 10px 20px;
+            text-align: center;
+            text-decoration: none;
+            display: inline-block;
+            font-size: 16px;
+            margin: 10px 2px;
+            cursor: pointer;
+            border-radius: 4px;
+        }
+        textarea {
+            width: 100%;
+            height: 100px;
+            padding: 12px 20px;
+            box-sizing: border-box;
+            border: 2px solid #ccc;
+            border-radius: 4px;
+            font-size: 16px;
+            resize: vertical;
+        }
+        select {
+            width: 100%;
+            padding: 10px;
+            font-size: 16px;
+            margin: 8px 0;
+        }
+        .log {
+            background-color: #f8f8f8;
+            border: 1px solid #ddd;
+            padding: 10px;
+            max-height: 200px;
+            overflow-y: auto;
+            margin-top: 20px;
+        }
+    </style>
+</head>
+<body>
+    <h1>Speech Synthesis Test Utility</h1>
+    
+    <div>
+        <h2>1. Test Browser Speech Capability</h2>
+        <p>This button checks if your browser supports speech synthesis:</p>
+        <button id="checkSupport">Check Speech Support</button>
+        <p id="supportResult"></p>
+    </div>
+
+    <div>
+        <h2>2. Available Voices</h2>
+        <p>Select a voice to use:</p>
+        <select id="voiceSelect">
+            <option value="">Loading voices...</option>
+        </select>
+        <button id="refreshVoices">Refresh Voice List</button>
+    </div>
+
+    <div>
+        <h2>3. Test Speech</h2>
+        <p>Enter text to speak:</p>
+        <textarea id="textToSpeak">Hello, this is a test of the speech synthesis system. Can you hear me now?</textarea>
+        <div>
+            <label for="rate">Rate:</label>
+            <input type="range" id="rate" min="0.1" max="2" value="1" step="0.1">
+            <span id="rateValue">1</span>
+        </div>
+        <div>
+            <label for="pitch">Pitch:</label>
+            <input type="range" id="pitch" min="0.1" max="2" value="1" step="0.1">
+            <span id="pitchValue">1</span>
+        </div>
+        <button id="speakButton">Speak Text</button>
+        <button id="stopButton">Stop Speaking</button>
+    </div>
+
+    <div>
+        <h2>4. Debug Log</h2>
+        <div class="log" id="logOutput"></div>
+    </div>
+
+    <script>
+        // Check for browser support
+        document.getElementById('checkSupport').addEventListener('click', function() {
+            const supportResult = document.getElementById('supportResult');
+            if ('speechSynthesis' in window) {
+                supportResult.textContent = '✅ Your browser supports speech synthesis!';
+                supportResult.style.color = 'green';
+                log('Speech synthesis is supported');
+            } else {
+                supportResult.textContent = '❌ Your browser does NOT support speech synthesis.';
+                supportResult.style.color = 'red';
+                log('Speech synthesis is not supported');
+            }
+        });
+
+        // Log function
+        function log(message) {
+            const logOutput = document.getElementById('logOutput');
+            const logEntry = document.createElement('div');
+            logEntry.textContent = `${new Date().toLocaleTimeString()}: ${message}`;
+            logOutput.appendChild(logEntry);
+            logOutput.scrollTop = logOutput.scrollHeight;
+        }
+
+        // Handle voice selection
+        const voiceSelect = document.getElementById('voiceSelect');
+        
+        function loadVoices() {
+            const voices = speechSynthesis.getVoices();
+            voiceSelect.innerHTML = '';
+            
+            if (voices.length === 0) {
+                const option = document.createElement('option');
+                option.textContent = 'No voices available';
+                voiceSelect.appendChild(option);
+                log('No voices loaded');
+                return;
+            }
+            
+            log(`Loaded ${voices.length} voices`);
+            
+            voices.forEach((voice, index) => {
+                const option = document.createElement('option');
+                option.value = index;
+                option.textContent = `${voice.name} (${voice.lang})${voice.default ? ' - DEFAULT' : ''}`;
+                voiceSelect.appendChild(option);
+                
+                // Log some details about each voice
+                log(`Voice ${index}: ${voice.name} (${voice.lang}) - Local: ${voice.localService}`);
+                
+                // Pre-select a good English voice if available
+                if ((voice.name.includes('Google') || voice.default) && 
+                    voice.lang.includes('en')) {
+                    option.selected = true;
+                }
+            });
+        }
+
+        // Load voices when available
+        if (speechSynthesis.onvoiceschanged !== undefined) {
+            speechSynthesis.onvoiceschanged = loadVoices;
+        }
+        
+        // Manual refresh of voices
+        document.getElementById('refreshVoices').addEventListener('click', function() {
+            log('Manually refreshing voices');
+            loadVoices();
+        });
+
+        // Initial load attempt
+        setTimeout(loadVoices, 200);
+
+        // Handle speaking
+        document.getElementById('speakButton').addEventListener('click', function() {
+            const text = document.getElementById('textToSpeak').value;
+            const rate = document.getElementById('rate').value;
+            const pitch = document.getElementById('pitch').value;
+            
+            if (!text) {
+                log('No text to speak');
+                return;
+            }
+            
+            // Stop any current speech
+            window.speechSynthesis.cancel();
+            
+            const utterance = new SpeechSynthesisUtterance(text);
+            
+            // Set voice if one is selected
+            const voices = speechSynthesis.getVoices();
+            const selectedVoice = voiceSelect.value;
+            if (selectedVoice && voices[selectedVoice]) {
+                utterance.voice = voices[selectedVoice];
+                log(`Using voice: ${voices[selectedVoice].name}`);
+            } else {
+                log('Using default voice');
+            }
+            
+            utterance.rate = parseFloat(rate);
+            utterance.pitch = parseFloat(pitch);
+            document.getElementById('rateValue').textContent = rate;
+            document.getElementById('pitchValue').textContent = pitch;
+            
+            // Events for tracking speech status
+            utterance.onstart = function(event) {
+                log(`Speech started`);
+            };
+            
+            utterance.onend = function(event) {
+                log(`Speech ended after ${event.elapsedTime} milliseconds`);
+            };
+            
+            utterance.onerror = function(event) {
+                log(`Speech error: ${event.error}`);
+            };
+            
+            log(`Speaking: "${text.substring(0, 20)}${text.length > 20 ? '...' : ''}"`);
+            window.speechSynthesis.speak(utterance);
+            
+            // Chrome has a bug where longer speeches get cut off
+            // This is a common workaround
+            if (text.length > 100) {
+                log('Long text detected, applying Chrome bug workaround');
+                const intervalId = setInterval(function() {
+                    if (speechSynthesis.speaking) {
+                        speechSynthesis.pause();
+                        speechSynthesis.resume();
+                    } else {
+                        clearInterval(intervalId);
+                    }
+                }, 10000);
+            }
+        });
+
+        // Stop speaking
+        document.getElementById('stopButton').addEventListener('click', function() {
+            window.speechSynthesis.cancel();
+            log('Speech stopped');
+        });
+        
+        // Update rate/pitch display values
+        document.getElementById('rate').addEventListener('input', function() {
+            document.getElementById('rateValue').textContent = this.value;
+        });
+        
+        document.getElementById('pitch').addEventListener('input', function() {
+            document.getElementById('pitchValue').textContent = this.value;
+        });
+    </script>
+</body>
+</html>

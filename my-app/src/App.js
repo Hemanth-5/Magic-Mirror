@@ -1,27 +1,49 @@
 import React, { useState, useEffect, useRef } from "react";
 import "./App.css";
-
-const recognition = new (window.SpeechRecognition ||
-  window.webkitSpeechRecognition)();
-recognition.continuous = true;
-recognition.interimResults = true;
+import SpotifyPlayer from './SpotifyPlayer';
+import MotionSensor from './MotionSensor';
 
 const App = () => {
   const [time, setTime] = useState("--:--:--");
   const [date, setDate] = useState("--/--/----");
   const [weatherTemp, setWeatherTemp] = useState("--°C");
   const [sensorTemp, setSensorTemp] = useState("--°C");
-  const [isListening, setIsListening] = useState(false);
+  const [inputText, setInputText] = useState("");
   const [speechText, setSpeechText] = useState("");
   const [aiResponse, setAiResponse] = useState("");
-  const [isActivated, setIsActivated] = useState(false); // Track activation
-  const [hasActivated, setHasActivated] = useState(false); // Track first activation
-  const [praise, setPraise] = useState(""); // Random praise message
+  const [isActivated, setIsActivated] = useState(false);
+  const [hasActivated, setHasActivated] = useState(false);
+  const [praise, setPraise] = useState("");
+  const [spotifyPlayerState, setSpotifyPlayerState] = useState(null);
+  const [showMusicPlayer, setShowMusicPlayer] = useState(false);
+  const [isAwake, setIsAwake] = useState(true);
+  const [data, setData] = useState(null);
+  const [isVercel, setIsVercel] = useState(false);
 
-  const canvasRef = useRef(null); // Ref for Analog Clock
+  const canvasRef = useRef(null);
+  const speechSynthesisRef = useRef({
+    speaking: false,
+    queue: [],
+    processing: false
+  });
 
-  const magicMirrorName = "magic"; // Set the name of the Magic Mirror
+  // Get environment variables with fallbacks
+  const API_URL = process.env.REACT_APP_API_URL || window.location.origin;
+  const HARDWARE_SERVER_URL = process.env.REACT_APP_HARDWARE_SERVER_URL || 'http://localhost:5001';
+  
+  // Detect if we're running on Vercel or locally
+  useEffect(() => {
+    // Check if the hostname contains vercel.app
+    const isVercelEnv = window.location.hostname.includes('vercel.app');
+    setIsVercel(isVercelEnv);
+    console.log(`Running in ${isVercelEnv ? 'Vercel' : 'local'} environment`);
+  }, []);
 
+  const magicMirrorName = "magic";
+
+  // Rest of your code remains the same...
+  
+  // Update time
   const updateTime = () => {
     const now = new Date();
     setTime(now.toLocaleTimeString());
@@ -39,68 +61,112 @@ const App = () => {
   };
 
   const speak = (text) => {
-    const synth = window.speechSynthesis;
-
-    // Cancel any ongoing speech to allow interruption
-    if (synth.speaking) {
-      console.log("Interrupting ongoing speech...");
-      synth.cancel();
-    }
-
-    // Ensure voices are ready
-    if (synth.getVoices().length === 0) {
-      console.error("Speech Synthesis voices are not ready yet.");
-      setTimeout(() => speak(text), 1000);
+    if (!text || typeof text !== 'string' || text.trim() === '') {
+      console.log("Empty text provided to speak function, ignoring.");
       return;
     }
 
-    // Split text into smaller sentences if needed
-    const sentences = text.match(/[^.!?]+[.!?]/g) || [text];
+    console.log("Trying to speak:", text);
 
-    const speakSentence = (index = 0) => {
-      if (index >= sentences.length) return; // Stop if done
+    // Force cancel any existing speech to clear the queue
+    if (window.speechSynthesis) {
+      window.speechSynthesis.cancel();
+    }
 
-      const utterance = new SpeechSynthesisUtterance(sentences[index].trim());
+    // Create utterance directly - simplifying the queue mechanism
+    try {
+      const utterance = new SpeechSynthesisUtterance(text);
       utterance.lang = "en-US";
-      utterance.rate = 1;
+      utterance.rate = 0.9;  // Slightly slower for better clarity
       utterance.pitch = 1;
+      utterance.volume = 1.0; // Maximum volume
+      
+      // Log when speech starts
+      utterance.onstart = () => {
+        console.log("Speech started");
+        speechSynthesisRef.current.speaking = true;
+      };
 
+      // Log when speech ends
       utterance.onend = () => {
-        console.log("Speech finished:", sentences[index]);
-        speakSentence(index + 1);
+        console.log("Speech ended");
+        speechSynthesisRef.current.speaking = false;
       };
 
+      // Log any errors
       utterance.onerror = (e) => {
-        console.error("Speech error: ", e);
+        console.error("Speech error:", e);
+        speechSynthesisRef.current.speaking = false;
       };
 
-      synth.speak(utterance);
-    };
+      // Check for voices and select a good one if available
+      let voices = window.speechSynthesis.getVoices();
+      if (voices.length === 0) {
+        // Force voice loading if needed
+        window.speechSynthesis.getVoices();
+      }
+      
+      // Try to find a good voice - prefer Google voices
+      voices = window.speechSynthesis.getVoices();
+      const preferredVoice = voices.find(v => 
+        (v.name.includes('Google') || v.name.includes('English')) && 
+        v.lang.includes('en')
+      );
+      
+      if (preferredVoice) {
+        console.log("Using voice:", preferredVoice.name);
+        utterance.voice = preferredVoice;
+      }
 
-    speakSentence(); // Start speaking
+      // Speak
+      console.log("Calling speech synthesis speak()");
+      window.speechSynthesis.speak(utterance);
+      
+      // Chrome bug workaround - if speech doesn't start after 1 second, try again
+      setTimeout(() => {
+        if (speechSynthesisRef.current.speaking === false) {
+          console.log("Speech didn't start, trying again");
+          window.speechSynthesis.cancel();
+          window.speechSynthesis.speak(utterance);
+        }
+      }, 1000);
+    } catch (error) {
+      console.error("Error setting up speech synthesis:", error);
+    }
+  };
+
+  // Remove the complex queue processing function since we're using a simpler approach
+  const processSpeechQueue = () => {
+    console.log("Speech queue processing is now handled directly in speak()");
   };
 
   const typeWriter = (text, setText) => {
-    console.log("Typing: ", text);
+    console.log("Typing:", text);
     let i = 0;
-    let typedText = ""; // Accumulate the text
+    let typedText = "";
+
+    // Start speaking immediately
+    speak(text);
 
     const interval = setInterval(() => {
       if (i < text.length) {
-        typedText += text.charAt(i); // Accumulate text
-        setText(typedText); // Update state once with the accumulated text
+        typedText += text.charAt(i);
+        setText(typedText);
         i++;
       } else {
         clearInterval(interval);
       }
     }, 50);
-
-    speak(text); // Speak after starting the typewriter effect
   };
 
   const sendToApi = async (query) => {
     try {
-      const response = await fetch("http://localhost:5000/ask", {
+      // If in Vercel, use the deployed API, otherwise use localhost
+      const apiUrl = isVercel ? `${API_URL}/ask` : "http://localhost:5000/ask";
+      
+      console.log(`Sending request to: ${apiUrl}`);
+      
+      const response = await fetch(apiUrl, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -112,67 +178,48 @@ const App = () => {
       const aiMessage =
         data.response || data.message || "Sorry, no response received.";
 
-      // console.log(aiMessage);
       setAiResponse(aiMessage);
 
+      // Only call typeWriter which will handle both typing and speaking
       typeWriter(aiMessage, setAiResponse);
+      // Removing the duplicate speak call
+      
+      const musicRelatedTerms = [
+        "playing", "music", "song", "track", "spotify", 
+        "paused", "playlist", "artist", "album"
+      ];
+
+      const isMusicQuery = musicRelatedTerms.some(term => 
+        aiMessage.toLowerCase().includes(term.toLowerCase())
+      );
+
+      if (isMusicQuery) {
+        setShowMusicPlayer(true);
+      }
     } catch (error) {
+      console.error("API request error:", error);
       setAiResponse("Sorry, I couldn't process your request.");
       speak("Sorry, I couldn't process your request.");
     }
   };
 
-  const toggleMic = () => {
-    const synth = window.speechSynthesis;
-
-    if (synth.speaking) {
-      synth.cancel();
-    }
-
-    if (isListening) {
-      recognition.stop();
-      setIsListening(false);
-    } else {
-      recognition.start();
-      setIsListening(true);
-      setSpeechText(""); // Clear speech text when starting new listening session
-      setAiResponse(""); // Clear AI response
-    }
-  };
-
-  const handleSpeechRecognition = (event) => {
-    let finalTranscript = "";
-    for (let i = event.resultIndex; i < event.results.length; i++) {
-      const result = event.results[i];
-      finalTranscript += result[0].transcript;
-    }
-    setSpeechText(finalTranscript);
-
-    // Check if the speech contains the activation phrase "magic"
-    if (finalTranscript.toLowerCase().includes(magicMirrorName.toLowerCase())) {
-      if (!isActivated) {
-        // If it's the first time, activate and stop further processing
-        setIsActivated(true);
-        setHasActivated(true); // First activation
-        speak("Hello! I'm activated and ready to listen.");
-        return; // Prevent processing the query if it's just the activation phrase
-      }
-    }
-
-    // Only process non-activation input after activation
-    if (
-      isActivated &&
-      hasActivated &&
-      event.results[event.results.length - 1].isFinal &&
-      !finalTranscript.toLowerCase().includes(magicMirrorName.toLowerCase()) // Ensure it's not the activation phrase
-    ) {
-      sendToApi(finalTranscript); // Send the query to AI if it's not the activation phrase
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    
+    if (!isActivated && inputText.toLowerCase().includes(magicMirrorName)) {
+      setIsActivated(true);
+      setHasActivated(true);
+      setAiResponse("Hello! I'm activated and ready for your questions.");
+      speak("Hello! I'm activated and ready for your questions.");
+      setInputText("");
+    } else if (isActivated && inputText.trim() !== "") {
+      setSpeechText(inputText);
+      sendToApi(inputText);
+      setInputText("");
     }
   };
 
   useEffect(() => {
-    recognition.onresult = handleSpeechRecognition;
-
     const timeInterval = setInterval(updateTime, 1000);
     const weatherInterval = setInterval(getWeather, 10000);
     const sensorInterval = setInterval(getSensorTemp, 10000);
@@ -182,7 +229,7 @@ const App = () => {
       clearInterval(weatherInterval);
       clearInterval(sensorInterval);
     };
-  }, [isActivated]);
+  }, []);
 
   useEffect(() => {
     const updateClock = () => {
@@ -201,7 +248,6 @@ const App = () => {
 
       ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-      // Draw clock face
       ctx.beginPath();
       ctx.arc(centerX, centerY, radius, 0, 2 * Math.PI);
       ctx.fillStyle = "rgba(255, 255, 255, 0.1)";
@@ -210,7 +256,6 @@ const App = () => {
       ctx.lineWidth = 2;
       ctx.stroke();
 
-      // Draw clock hands
       const drawHand = (angle, length, width) => {
         ctx.beginPath();
         ctx.lineWidth = width;
@@ -223,43 +268,81 @@ const App = () => {
         ctx.stroke();
       };
 
-      // Get time angles
       const secondAngle = (now.getSeconds() / 60) * 2 * Math.PI - Math.PI / 2;
       const minuteAngle = (now.getMinutes() / 60) * 2 * Math.PI - Math.PI / 2;
       const hourAngle =
         ((now.getHours() % 12) / 12) * 2 * Math.PI - Math.PI / 2;
 
-      // Draw hands
-      drawHand(hourAngle, 25, 4); // Hour hand
-      drawHand(minuteAngle, 35, 3); // Minute hand
-      drawHand(secondAngle, 40, 1.5); // Second hand
+      drawHand(hourAngle, 25, 4);
+      drawHand(minuteAngle, 35, 3);
+      drawHand(secondAngle, 40, 1.5);
     };
 
     const interval = setInterval(updateClock, 1000);
     return () => clearInterval(interval);
   }, []);
 
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        // Use the appropriate API URL based on environment
+        const dataUrl = isVercel ? `${API_URL}/api/data` : `${API_URL}/api/data`;
+        
+        console.log(`Fetching data from: ${dataUrl}`);
+        const response = await fetch(dataUrl);
+        const result = await response.json();
+        setData(result);
+      } catch (error) {
+        console.error('Error fetching data:', error);
+      }
+    };
+
+    fetchData();
+    const intervalId = setInterval(fetchData, 300000);
+    
+    return () => clearInterval(intervalId);
+  }, [API_URL, isVercel]);
+
+  const handlePresenceChange = (isPresent) => {
+    console.log('Presence changed:', isPresent);
+    setIsAwake(isPresent);
+  };
+
+  const displayStyle = {
+    transition: 'opacity 1s ease-in-out',
+    opacity: isAwake ? 1 : 0,
+    height: '100vh',
+    width: '100vw',
+    backgroundColor: '#000',
+    color: '#fff',
+    display: 'flex',
+    flexDirection: 'column',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: '20px'
+  };
+
   const praises = [
-    "You’re looking radiant today!",
+    "You're looking radiant today!",
     "That outfit looks fantastic on you!",
     "Your smile is absolutely glowing.",
     "Your confidence is shining through.",
     "You look stunning as always.",
     "Your eyes are sparkling today!",
-    "That look is on point. You’re rocking it!",
+    "That look is on point. You're rocking it!",
     "Your hair looks amazing—did you do something new?",
-    "You’ve got that perfect glow today.",
-    "You’re looking sharp and stylish.",
+    "You've got that perfect glow today.",
+    "You're looking sharp and stylish.",
     "You have a natural elegance about you.",
     "Your energy and style are so captivating.",
-    "You’ve got that glow-up feeling today!",
+    "You've got that glow-up feeling today!",
     "Everything about your look is flawless.",
     "Your posture is perfect—own it!",
     "You look ready to take on the world!",
     "That color looks amazing on you.",
     "You make this look effortless—pure class.",
     "Your skin is glowing—looking healthy and refreshed.",
-    "You’re looking more confident with every day!",
+    "You're looking more confident with every day!",
   ];
 
   useEffect(() => {
@@ -270,43 +353,77 @@ const App = () => {
     }, 5000);
   }, []);
 
+  // Clean up speech synthesis on component unmount
+  useEffect(() => {
+    return () => {
+      if (window.speechSynthesis) {
+        window.speechSynthesis.cancel();
+      }
+    };
+  }, []);
+
   return (
     <div className="App">
-      <h1>
-        <div className="praise">
-          {isActivated ? praise : "Say my name to activate."}
+      <div style={displayStyle}>
+        {data && (
+          <h1><div className="data-display">
+            <div className="data-item weather">
+              <strong> {data.weather}</strong>
+            </div>
+          </div></h1>
+        )}
+        <h1>
+          <div className="praise">
+            {isActivated ? praise : "Type 'magic' to activate."}
+          </div>
+        </h1>
+        <div className="info-widget">
+          <canvas ref={canvasRef} width="100" height="100"></canvas>
+          <div className="date">{date}</div>
+          <div className="weather-temp">
+            <div>{weatherTemp}</div>
+            <div>{sensorTemp}</div>
+          </div>
+          {isVercel && (
+            <div className="environment-badge">
+              Running on Vercel
+            </div>
+          )}
         </div>
-      </h1>
-      <div className="info-widget">
-        <canvas ref={canvasRef} width="100" height="100"></canvas>
-        <div className="date">{date}</div>
-        <div className="weather-temp">
-          <div>{weatherTemp}</div>
-          <div>{sensorTemp}</div>
-        </div>
+
+        <form onSubmit={handleSubmit} className="input-form">
+          <input 
+            type="text" 
+            value={inputText} 
+            onChange={(e) => setInputText(e.target.value)} 
+            placeholder={isActivated ? "Ask me anything..." : "Type 'magic' to activate"}
+            className="text-input"
+          />
+          <button type="submit" className="submit-btn">Send</button>
+        </form>
+
+        {showMusicPlayer && (
+          <div className="spotify-container">
+            <SpotifyPlayer onPlayerStateChange={setSpotifyPlayerState} />
+          </div>
+        )}
+
+        {speechText && (
+          <div className="speech-text show">
+            <strong>You:</strong> {speechText}
+          </div>
+        )}
+
+        {aiResponse && (
+          <div className={`ai-response ${aiResponse ? "show" : ""}`}>
+            <strong>Mirror:</strong> {aiResponse}
+          </div>
+        )}
+
       </div>
-
-      <div
-        className={`microphone-btn ${isListening ? "active" : ""}`}
-        onClick={toggleMic}
-      >
-        <span className="pulse"></span>
-        <div className="listening">
-          {isListening ? "Listening..." : "Tap to Speak"}
-        </div>
-      </div>
-
-      {speechText && (
-        <div className="speech-text show">
-          <strong></strong> {speechText}
-        </div>
-      )}
-
-      {aiResponse && (
-        <div className={`ai-response ${aiResponse ? "show" : ""}`}>
-          <strong></strong> {aiResponse}
-        </div>
-      )}
+      
+      {/* Only use MotionSensor when not in Vercel environment */}
+      <MotionSensor onPresenceChange={handlePresenceChange}/>
     </div>
   );
 };
