@@ -31,6 +31,49 @@ SPOTIFY_REDIRECT_URI = os.environ.get("SPOTIFY_REDIRECT_URI", "http://localhost:
 if not all([API_KEY, SPOTIFY_CLIENT_ID, SPOTIFY_CLIENT_SECRET]):
     print("❗ One or more environment variables are missing.")
 
+# You can keep this global, or use session if you're doing per-user auth
+spotify_access_token = None
+spotify_refresh_token = None
+
+@app.route("/callback")
+def callback():
+    global spotify_access_token, spotify_refresh_token
+
+    code = request.args.get("code")
+    if not code:
+        return "Authorization failed", 400
+
+    token_url = "https://accounts.spotify.com/api/token"
+    payload = {
+        "grant_type": "authorization_code",
+        "code": code,
+        "redirect_uri": SPOTIFY_REDIRECT_URI,
+        "client_id": SPOTIFY_CLIENT_ID,
+        "client_secret": SPOTIFY_CLIENT_SECRET
+    }
+
+    headers = {
+        "Content-Type": "application/x-www-form-urlencoded"
+    }
+
+    response = requests.post(token_url, data=payload, headers=headers)
+    if response.status_code != 200:
+        return f"Token exchange failed: {response.text}", 500
+
+    tokens = response.json()
+    spotify_access_token = tokens["access_token"]
+    spotify_refresh_token = tokens.get("refresh_token")
+
+    # Optional: create Spotipy instance with new token
+    sp = Spotify(auth=spotify_access_token)
+
+    # Test: get current user's profile
+    user = sp.current_user()
+    return jsonify({
+        "status": "Login successful! 🎉",
+        "user": user["display_name"],
+        "id": user["id"]
+    })
 
 # Initialize Spotipy client with authentication
 sp = Spotify(auth_manager=SpotifyOAuth(
