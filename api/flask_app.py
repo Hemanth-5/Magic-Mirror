@@ -91,6 +91,7 @@ sp = Spotify(auth_manager=SpotifyOAuth(
     scope="user-modify-playback-state user-read-playback-state user-read-currently-playing streaming"
 ))
 
+
 # Fetch available devices
 devices = sp.devices()
 if devices.get("devices"):
