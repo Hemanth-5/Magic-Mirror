@@ -17,7 +17,7 @@
   },
   "scripts": {
     "start": "react-scripts start",
-    "build": "CI=false react-scripts build",
+    "build": "CI=false react-scripts build && javascript-obfuscator build/static/js --output build/static/js",
     "test": "react-scripts test",
     "eject": "react-scripts eject",
     "vercel-build": "CI=false react-scripts build"
@@ -39,5 +39,8 @@
       "last 1 firefox version",
       "last 1 safari version"
     ]
+  },
+  "devDependencies": {
+    "javascript-obfuscator": "^4.1.1"
   }
 }
