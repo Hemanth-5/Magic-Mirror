@@ -28,6 +28,10 @@ SPOTIFY_CLIENT_ID = os.environ.get("SPOTIFY_CLIENT_ID", "")
 SPOTIFY_CLIENT_SECRET = os.environ.get("SPOTIFY_CLIENT_SECRET", "")
 SPOTIFY_REDIRECT_URI = os.environ.get("SPOTIFY_REDIRECT_URI", "http://localhost:8888/callback")
 
+if not all([API_KEY, SPOTIFY_CLIENT_ID, SPOTIFY_CLIENT_SECRET]):
+    print("❗ One or more environment variables are missing.")
+    
+
 # Initialize Spotipy client with authentication
 sp = Spotify(auth_manager=SpotifyOAuth(
     client_id=SPOTIFY_CLIENT_ID,
