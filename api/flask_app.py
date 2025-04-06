@@ -31,14 +31,27 @@ SPOTIFY_REDIRECT_URI = os.environ.get("SPOTIFY_REDIRECT_URI", "http://localhost:
 if not all([API_KEY, SPOTIFY_CLIENT_ID, SPOTIFY_CLIENT_SECRET]):
     print("❗ One or more environment variables are missing.")
 
-# You can keep this global, or use session if you're doing per-user auth
-spotify_access_token = None
-spotify_refresh_token = None
+# This will hold the authenticated Spotify instance
+sp = None
 
+# Step 1: Redirect user to Spotify login
+@app.route("/")
+def login():
+    scope = "user-read-playback-state"
+    auth_url = (
+        "https://accounts.spotify.com/authorize"
+        "?response_type=code"
+        f"&client_id={SPOTIFY_CLIENT_ID}"
+        f"&redirect_uri={SPOTIFY_REDIRECT_URI}"
+        f"&scope={scope}"
+    )
+    return redirect(auth_url)
+
+
+# Step 2: Callback URL Spotify redirects to after login
 @app.route("/callback")
 def callback():
-    global spotify_access_token, spotify_refresh_token
-
+    global sp
     code = request.args.get("code")
     if not code:
         return "Authorization failed", 400
@@ -57,23 +70,18 @@ def callback():
     }
 
     response = requests.post(token_url, data=payload, headers=headers)
+
     if response.status_code != 200:
         return f"Token exchange failed: {response.text}", 500
 
     tokens = response.json()
-    spotify_access_token = tokens["access_token"]
-    spotify_refresh_token = tokens.get("refresh_token")
+    access_token = tokens["access_token"]
+    # refresh_token = tokens["refresh_token"]  # Optional, store it if needed
 
-    # Optional: create Spotipy instance with new token
-    sp = Spotify(auth=spotify_access_token)
+    # Create authenticated Spotify client
+    sp = Spotify(auth=access_token)
 
-    # Test: get current user's profile
-    user = sp.current_user()
-    return jsonify({
-        "status": "Login successful! 🎉",
-        "user": user["display_name"],
-        "id": user["id"]
-    })
+    return "Login successful! You can now access /devices."
 
 # Initialize Spotipy client with authentication
 sp = Spotify(auth_manager=SpotifyOAuth(
