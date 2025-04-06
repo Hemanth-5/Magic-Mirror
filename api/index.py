@@ -1283,10 +1283,6 @@ def get_ai_response_for_music_query(user_query):
     response = get_gemini_response(prompt)
     return response
 
-@app.route("/")
-def home():
-    return "Hello from Flask on Vercel!"
-
 # if __name__ == "__main__":
 #     app.run(debug=True, host='0.0.0.0', port=5000)
 
