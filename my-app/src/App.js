@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from "react";
 import "./App.css";
 import SpotifyPlayer from './SpotifyPlayer';
 import MotionSensor from './MotionSensor';
+import { handleSpotifyCallback } from './utils/SpotifyAuth';
 
 const App = () => {
   const [time, setTime] = useState("--:--:--");
@@ -368,6 +369,15 @@ const App = () => {
     window.location.href = `${API_URL}/login`; // Redirect to backend login endpoint
   };
 
+  // Handle Spotify OAuth callback on app mount
+  useEffect(() => {
+    // Check if we're returning from Spotify OAuth
+    handleSpotifyCallback((token) => {
+      console.log('Spotify authentication successful');
+      setShowMusicPlayer(true); // Show the music player when auth is successful
+    });
+  }, []);
+
   return (
     <div className="App">
       <div style={displayStyle}>
@@ -390,11 +400,11 @@ const App = () => {
             <div>{weatherTemp}</div>
             <div>{sensorTemp}</div>
           </div>
-          {isVercel && (
+          {/* {isVercel && (
             <div className="environment-badge">
               Running on Vercel
             </div>
-          )}
+          )} */}
         </div>
 
         <form onSubmit={handleSubmit} className="input-form">

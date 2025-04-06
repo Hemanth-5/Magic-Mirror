@@ -1,5 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import './SpotifyPlayer.css';
+import { 
+  initiateSpotifyLogin, 
+  getStoredSpotifyToken, 
+  handleSpotifyCallback 
+} from './utils/SpotifyAuth';
 
 const SpotifyPlayer = ({ onPlayerStateChange }) => {
   const [player, setPlayer] = useState(null);
@@ -19,29 +24,12 @@ const SpotifyPlayer = ({ onPlayerStateChange }) => {
     const isVercelEnvironment = window.location.hostname.includes('vercel.app');
     setIsVercelEnv(isVercelEnvironment);
     
-    if (isVercelEnvironment) {
-      console.log('Running on Vercel - Spotify integration will use mock data');
-      // Set up mock data for Vercel environment
-      setCurrentTrack({
-        name: 'Demo Track (Vercel Mode)',
-        artist: 'Example Artist',
-        image: 'https://via.placeholder.com/300'
-      });
-      setIsActive(true);
-      setIsPaused(false);
-      setDuration(180); // 3 minutes mock song
-      
-      // Start mock progress timer
-      const timer = setInterval(() => {
-        setProgress(prev => {
-          if (prev >= 180) return 0; // Loop at 3 minutes
-          return prev + 0.1;
-        });
-      }, 100);
-      
-      return () => clearInterval(timer);
-    }
-    
+    // Check for Spotify OAuth callback/token when component mounts
+    handleSpotifyCallback((token) => {
+      console.log('Successfully authenticated with Spotify');
+      // After authentication, the page will reload with the token
+    });
+
     // Function to initialize the Spotify Web Playback SDK (only for non-Vercel environments)
     const initializePlayer = async () => {
       // Don't re-initialize if already done
@@ -49,16 +37,22 @@ const SpotifyPlayer = ({ onPlayerStateChange }) => {
       setIsInitialized(true);
       
       try {
-        // Get token from backend
-        const API_URL = process.env.REACT_APP_API_URL || window.location.origin;
-        const response = await fetch(`${API_URL}/get-spotify-token`);
-        const data = await response.json();
+        // First check if we have a stored token
+        let token = getStoredSpotifyToken();
         
-        if (response.status !== 200) {
-          throw new Error(data.error || 'Failed to retrieve Spotify token');
+        // If no stored token, try to get it from the backend
+        if (!token) {
+          const API_URL = process.env.REACT_APP_API_URL || window.location.origin;
+          const response = await fetch(`${API_URL}/get-spotify-token`);
+          const data = await response.json();
+          
+          if (response.status !== 200) {
+            throw new Error(data.error || 'Failed to retrieve Spotify token');
+          }
+          
+          token = data.token;
         }
         
-        const token = data.token;
         if (!token) {
           throw new Error('No Spotify token available');
         }
@@ -272,14 +266,13 @@ const SpotifyPlayer = ({ onPlayerStateChange }) => {
     }
   };
 
-  // Add a button to redirect to Spotify login
+  // Update the handleSpotifyLogin function to use our auth utility
   const handleSpotifyLogin = () => {
-    const API_URL = process.env.REACT_APP_API_URL || window.location.origin;
-    window.location.href = `${API_URL}/login`; // Redirect to backend login endpoint
+    initiateSpotifyLogin();
   };
 
   // Add a login button when the player is inactive
-  if (!isActive && !isVercelEnv) {
+  if (!isActive) {
     return (
       <div className="spotify-player inactive">
         <div className="player-status">
@@ -303,7 +296,7 @@ const SpotifyPlayer = ({ onPlayerStateChange }) => {
     );
   }
 
-  if (!isActive && !isVercelEnv) {
+  if (!isActive) {
     return (
       <div className="spotify-player inactive">
         <div className="player-status">
@@ -365,17 +358,17 @@ const SpotifyPlayer = ({ onPlayerStateChange }) => {
             </button>
           </div>
           
-          {isVercelEnv && (
+          {/* {isVercelEnv && (
             <div className="vercel-notice">
               <p className="small">Demo mode (Vercel deployment)</p>
             </div>
-          )}
+          )} */}
         </>
       ) : (
         <div className="no-track">
           <p>Ready to play music</p>
           <p className="small">Try saying "Play some jazz" or "Play Taylor Swift"</p>
-          {isVercelEnv && <p className="small">(Demo mode on Vercel)</p>}
+          {/* {isVercelEnv && <p className="small">(Demo mode on Vercel)</p>} */}
         </div>
       )}
     </div>
