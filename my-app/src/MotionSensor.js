@@ -17,7 +17,7 @@ const MotionSensor = ({ onPresenceChange }) => {
     try {
       await fetch(`${HARDWARE_SERVER_URL}/screen`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', "ngrok-skip-browser-warning": "true" },
         body: JSON.stringify({ action }),
       });
       console.log(`✅ Screen ${action.toUpperCase()} command sent`);
@@ -33,7 +33,10 @@ const MotionSensor = ({ onPresenceChange }) => {
 
     const checkDistance = async () => {
       try {
-        const response = await fetch(`${HARDWARE_SERVER_URL}/distance`);
+        const response = await fetch(`${HARDWARE_SERVER_URL}/distance`, {
+          method: 'GET',
+          headers: { 'Content-Type': 'application/json', "ngrok-skip-browser-warning": "true" },
+        });
         if (!response.ok) throw new Error(`Distance fetch failed: ${response.status}`);
         const data = await response.json();
         const currentDistance = data.distance;
