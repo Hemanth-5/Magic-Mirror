@@ -6,7 +6,7 @@ import {
   handleSpotifyCallback 
 } from './utils/SpotifyAuth';
 
-const SpotifyPlayer = ({ onPlayerStateChange }) => {
+const SpotifyPlayer = ({ onPlayerStateChange, onLoginRedirect }) => {
   const [player, setPlayer] = useState(null);
   const [deviceId, setDeviceId] = useState('');
   const [isActive, setIsActive] = useState(false);
@@ -18,6 +18,7 @@ const SpotifyPlayer = ({ onPlayerStateChange }) => {
   const [duration, setDuration] = useState(0);
   const [progressTimer, setProgressTimer] = useState(null);
   const [isVercelEnv, setIsVercelEnv] = useState(false);
+  const [isReady, setIsReady] = useState(false);
 
   const API_URL = process.env.REACT_APP_API_URL || window.location.origin;
   console.log(API_URL)
@@ -96,6 +97,7 @@ const SpotifyPlayer = ({ onPlayerStateChange }) => {
           setPlayer(spotifyPlayer);
           setIsActive(true); // Mark as active when ready
           setError(null);
+          setIsReady(true);
           
           // Tell the backend about this player
           fetch(`${API_URL}/set-active-device`, {
