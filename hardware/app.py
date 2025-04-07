@@ -12,7 +12,7 @@ except (ImportError, RuntimeError):
     IS_PI = False
 
 app = Flask(__name__)
-CORS(app, resources={r"/*": {"origins": "*"}})  # For development only
+CORS(app, origin='*')  # Enable CORS for all routes
 
 # GPIO Setup (only on Pi)
 TRIG_PIN = 23
@@ -89,4 +89,4 @@ def home():
     return "✅ Hardware server running on Raspberry Pi"
 
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5001)
+    app.run(host='0.0.0.0', port=5001, ssl_context=('cert.pem', 'key.pem'))

@@ -30,23 +30,27 @@ const MotionSensor = ({ onPresenceChange }) => {
 
   useEffect(() => {
     let intervalId = null;
-
+  
     const checkDistance = async () => {
       try {
         const response = await fetch(`${HARDWARE_SERVER_URL}/distance`, {
           method: 'GET',
-          headers: { 'Content-Type': 'application/json', "ngrok-skip-browser-warning": "true" },
+          headers: {
+            'Content-Type': 'application/json',
+            'ngrok-skip-browser-warning': 'true',
+          },
         });
+  
         if (!response.ok) throw new Error(`Distance fetch failed: ${response.status}`);
         const data = await response.json();
         const currentDistance = data.distance;
-
+  
         setDistance(currentDistance);
         const isSomeonePresent = currentDistance <= PRESENCE_THRESHOLD;
-
+  
         if (isSomeonePresent) {
           consistentAbsenceCountRef.current = 0;
-
+  
           if (!isPresent) {
             console.log('🙋 Presence detected');
             setIsPresent(true);
@@ -55,7 +59,7 @@ const MotionSensor = ({ onPresenceChange }) => {
         } else {
           consistentAbsenceCountRef.current++;
           console.log(`🤷 No presence (${consistentAbsenceCountRef.current}/${REQUIRED_ABSENCE_COUNT})`);
-
+  
           if (consistentAbsenceCountRef.current >= REQUIRED_ABSENCE_COUNT && isPresent) {
             console.log('😴 Absence confirmed');
             setIsPresent(false);
@@ -67,16 +71,20 @@ const MotionSensor = ({ onPresenceChange }) => {
         setError(err.message);
       }
     };
-
-    consistentAbsenceCountRef.current = 0;
+  
+    // Initial check
     checkDistance();
+  
+    // Start interval
     intervalId = setInterval(checkDistance, CHECK_INTERVAL);
-
+  
+    // Cleanup
     return () => {
       clearInterval(intervalId);
-      console.log('🔁 Cleared interval');
+      console.log('🔁 Interval cleared');
     };
-  }, [onPresenceChange, HARDWARE_SERVER_URL]);
+  }, [HARDWARE_SERVER_URL, PRESENCE_THRESHOLD, REQUIRED_ABSENCE_COUNT, isPresent]);
+  
 
   const debugStyle = {
     position: 'absolute',
