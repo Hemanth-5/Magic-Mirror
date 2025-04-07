@@ -43,6 +43,7 @@ const SpotifyPlayer = ({ onPlayerStateChange }) => {
         // If no stored token, try to get it from the backend
         if (!token) {
           const API_URL = process.env.REACT_APP_API_URL || window.location.origin;
+          console.log(API_URL)
           const response = await fetch(`${API_URL}/get-spotify-token`);
           const data = await response.json();
           
