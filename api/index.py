@@ -80,12 +80,64 @@ def callback():
 
     # Initialize the Spotify client with the access token
     sp = Spotify(auth=access_token)
+    
+    # Verify Spotify client is initialized
+    try:
+        # Test the Spotify client with a simple API call
+        user_info = sp.current_user()
+        print(f"Spotify client initialized successfully for user: {user_info.get('id', 'unknown')}")
+    except Exception as e:
+        print(f"Warning: Spotify client initialization issue: {e}")
+        # Still create the client even if test fails
+        sp = Spotify(auth=access_token)
 
     # Get the frontend URL - handle different environments
     frontend_url = os.environ.get("FRONTEND_URL", "http://localhost:3000")
     
-    # Redirect back to the frontend with token
-    return redirect(f"{frontend_url}?token={access_token}")
+    # Return success page with token and auto-close script
+    success_html = f"""
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <title>Spotify Authorization Successful</title>
+        <style>
+            body {{ font-family: Arial, sans-serif; text-align: center; padding: 40px; }}
+            .success {{ color: green; font-size: 24px; margin: 20px 0; }}
+            .token {{ background: #f1f1f1; padding: 10px; border-radius: 4px; margin: 20px auto; max-width: 80%; overflow-wrap: break-word; }}
+            .info {{ font-size: 16px; margin: 20px 0; }}
+        </style>
+    </head>
+    <body>
+        <div class="success">Spotify Authorization Successful!</div>
+        <div class="info">You can close this tab and return to the Magic Mirror.</div>
+        <div class="token">Token: {access_token}</div>
+        
+        <script>
+        // Store token in localStorage (in case user is on same device as frontend)
+        try {{
+            localStorage.setItem('spotify_token', '{access_token}');
+            localStorage.setItem('spotify_token_timestamp', Date.now());
+            console.log('Token stored in localStorage');
+            
+            // Notify opener window if it exists
+            if (window.opener) {{
+                window.opener.postMessage({{ type: 'SPOTIFY_AUTH_SUCCESS', token: '{access_token}' }}, '*');
+                console.log('Token sent to opener window');
+            }}
+            
+            // Auto-close after 5 seconds
+            setTimeout(() => {{
+                window.close();
+            }}, 5000);
+        }} catch(e) {{
+            console.error('Error storing token:', e);
+        }}
+        </script>
+    </body>
+    </html>
+    """
+    
+    return success_html
 
 # Remove the global initialization of the Spotify client and devices fetching logic
 sp = None

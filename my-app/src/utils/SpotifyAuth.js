@@ -9,7 +9,8 @@ const API_URL = process.env.REACT_APP_API_URL || window.location.origin;
  * Initiate the Spotify login process
  */
 export const initiateSpotifyLogin = () => {
-  window.location.href = `${API_URL}/login`;
+  // Open in a new tab instead of redirecting
+  window.open(`${API_URL}/login`, '_blank');
 };
 
 /**
