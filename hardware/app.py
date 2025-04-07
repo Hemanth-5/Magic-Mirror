@@ -25,8 +25,9 @@ if IS_PI:
 
 def get_distance():
     if not IS_PI:
-        print("[MOCK] Returning fake distance: 100 cm")
-        return 160.0
+        print("[MOCK] Returning fake distance")
+        random_distance = 50  # Mock distance for non-Pi environments
+        return random_distance
 
     # Ensure trigger is LOW
     GPIO.output(TRIG_PIN, False)

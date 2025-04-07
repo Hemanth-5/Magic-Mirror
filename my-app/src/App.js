@@ -109,10 +109,19 @@ const App = () => {
       
       // Try to find a good voice - prefer Google voices
       voices = window.speechSynthesis.getVoices();
-      const preferredVoice = voices.find(v => 
-        (v.name.includes('Google') || v.name.includes('English')) && 
-        v.lang.includes('en')
+      const preferredVoice = voices.find(v =>
+        v.name.toLowerCase().includes('google') &&
+        v.lang.toLowerCase().includes('en') &&
+        v.name.toLowerCase().includes('female')
+      ) || voices.find(v =>
+        v.name.toLowerCase().includes('google') &&
+        v.lang.toLowerCase().includes('en')
+      ) || voices.find(v =>
+        v.lang.toLowerCase().includes('en') && v.name.toLowerCase().includes('female')
+      ) || voices.find(v =>
+        v.lang.toLowerCase().includes('en')
       );
+      
       
       if (preferredVoice) {
         console.log("Using voice:", preferredVoice.name);
