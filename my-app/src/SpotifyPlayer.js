@@ -28,11 +28,24 @@ const SpotifyPlayer = ({ onPlayerStateChange, onLoginRedirect }) => {
     const isVercelEnvironment = window.location.hostname.includes('vercel.app');
     setIsVercelEnv(isVercelEnvironment);
     
+    // Load Spotify SDK script if it doesn't exist yet
+    if (!window.Spotify && !document.getElementById('spotify-player-script')) {
+      const script = document.createElement('script');
+      script.id = 'spotify-player-script';
+      script.src = 'https://sdk.scdn.co/spotify-player.js';
+      script.async = true;
+      document.body.appendChild(script);
+    }
+
     // Check for Spotify OAuth callback/token when component mounts
     handleSpotifyCallback((token) => {
       console.log('Successfully authenticated with Spotify');
       // After authentication, the page will reload with the token
     });
+
+    // Check for Spotify token - using direct localStorage check for immediacy
+    const token = localStorage.getItem('spotify_token');
+    console.log('Token from local storage:', token ? 'Found' : 'Not found');
 
     // Function to initialize the Spotify Web Playback SDK (only for non-Vercel environments)
     const initializePlayer = async () => {
