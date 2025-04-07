@@ -52,7 +52,7 @@ def login():
 # Step 2: Callback URL Spotify redirects to after login
 @app.route("/callback")
 def callback():
-    global sp
+    global sp, active_device_id
     code = request.args.get("code")
     if not code:
         return "Authorization failed", 400
@@ -83,17 +83,37 @@ def callback():
     
     # Verify Spotify client is initialized
     try:
-        # Test the Spotify client with a simple API call
         user_info = sp.current_user()
         print(f"Spotify client initialized successfully for user: {user_info.get('id', 'unknown')}")
     except Exception as e:
-        print(f"Warning: Spotify client initialization issue: {e}")
-        # Still create the client even if test fails
-        sp = Spotify(auth=access_token)
+        print(f"Error initializing Spotify client: {e}")
+        return "Failed to initialize Spotify client", 500
 
-    # Get the frontend URL - handle different environments
-    frontend_url = os.environ.get("FRONTEND_URL", "http://localhost:3000")
-    
+    # Set the active device
+    try:
+        devices = sp.devices()
+        available_devices = devices.get('devices', [])
+
+        if not available_devices:
+            print("No available Spotify devices found. Please open Spotify on a device.")
+            return "No active Spotify devices found. Please open Spotify on a device.", 400
+
+        # Prefer active devices, then the first available device
+        active_devices = [d for d in available_devices if d.get('is_active')]
+
+        if active_devices:
+            active_device_id = active_devices[0]['id']
+            print(f"Using currently active device: {active_devices[0]['name']} ({active_device_id})")
+        else:
+            active_device_id = available_devices[0]['id']
+            print(f"No active device, using first available: {available_devices[0]['name']} ({active_device_id})")
+
+        # Transfer playback to the active device
+        sp.transfer_playback(device_id=active_device_id, force_play=False)
+    except Exception as e:
+        print(f"Error setting active device: {e}")
+        return "Failed to set active Spotify device. Please ensure Spotify is open.", 500
+
     # Return success page with token and auto-close script
     success_html = f"""
     <!DOCTYPE html>
@@ -103,29 +123,20 @@ def callback():
         <style>
             body {{ font-family: Arial, sans-serif; text-align: center; padding: 40px; }}
             .success {{ color: green; font-size: 24px; margin: 20px 0; }}
-            .token {{ background: #f1f1f1; padding: 10px; border-radius: 4px; margin: 20px auto; max-width: 80%; overflow-wrap: break-word; }}
             .info {{ font-size: 16px; margin: 20px 0; }}
         </style>
     </head>
     <body>
         <div class="success">Spotify Authorization Successful!</div>
         <div class="info">You can close this tab and return to the Magic Mirror.</div>
-        <div class="token">Token: {access_token}</div>
         
         <script>
-        // Store token in localStorage (in case user is on same device as frontend)
         try {{
             localStorage.setItem('spotify_token', '{access_token}');
             localStorage.setItem('spotify_token_timestamp', Date.now());
-            console.log('Token stored in localStorage');
-            
-            // Notify opener window if it exists
             if (window.opener) {{
                 window.opener.postMessage({{ type: 'SPOTIFY_AUTH_SUCCESS', token: '{access_token}' }}, '*');
-                console.log('Token sent to opener window');
             }}
-            
-            // Auto-close after 5 seconds
             setTimeout(() => {{
                 window.close();
             }}, 5000);
@@ -551,7 +562,7 @@ def ask_google_assistant(prompt):
 
 def get_similar_songs(song_name, artist=None, limit=5):
     """Get similar songs to a given track using Spotify recommendations."""
-    try:
+    try {
         # First search for the seed track
         query = f"track:{song_name}"
         if artist:

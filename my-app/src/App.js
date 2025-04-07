@@ -378,6 +378,26 @@ const App = () => {
     });
   }, []);
 
+  // Add this in the useEffect or componentDidMount of your main component
+  useEffect(() => {
+    const handleSpotifyAuthMessage = (event) => {
+      if (event.data && event.data.type === 'SPOTIFY_AUTH_SUCCESS') {
+        const { token } = event.data;
+        localStorage.setItem('spotify_token', token);
+        localStorage.setItem('spotify_token_timestamp', Date.now());
+        console.log('Spotify token stored successfully:', token);
+      }
+    };
+
+    // Add event listener for messages from the Spotify auth tab
+    window.addEventListener('message', handleSpotifyAuthMessage);
+
+    // Cleanup the event listener on component unmount
+    return () => {
+      window.removeEventListener('message', handleSpotifyAuthMessage);
+    };
+  }, []);
+
   return (
     <div className="App">
       <div style={displayStyle}>
