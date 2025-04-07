@@ -1,4 +1,4 @@
-from flask import Flask, request, jsonify, redirect
+from flask import Flask, request, jsonify, redirect, session
 from flask_cors import CORS  # Import CORS
 import google.generativeai as genai
 from spotipy import Spotify
@@ -22,40 +22,45 @@ model = genai.GenerativeModel("gemini-1.5-flash")
 
 # Configure Flask app
 app = Flask(__name__)
+app.secret_key = os.environ.get("FLASK_SECRET_KEY", os.urandom(24))  # Add secret key for session
 CORS(app, resources={r"/*": {"origins": "*"}})  # For development only
 
-# Spotify API credentials
+if not API_KEY:
+    print("❗ Google API key is missing.")
+
+# Spotify API credentials - moved back from auth.py
 SPOTIFY_CLIENT_ID = os.environ.get("SPOTIFY_CLIENT_ID", "")
 SPOTIFY_CLIENT_SECRET = os.environ.get("SPOTIFY_CLIENT_SECRET", "")
 SPOTIFY_REDIRECT_URI = os.environ.get("SPOTIFY_REDIRECT_URI", "http://localhost:8888/callback")
 
-if not all([API_KEY, SPOTIFY_CLIENT_ID, SPOTIFY_CLIENT_SECRET]):
-    print("❗ One or more environment variables are missing.")
-
 # This will hold the authenticated Spotify instance
 sp = None
 
-# Step 1: Redirect user to Spotify login
+# Step 1: Redirect user to Spotify login - moved back from auth.py
 @app.route("/login")
 def login():
-    scope = "user-read-playback-state user-modify-playback-state"
+    """Redirect user to Spotify login page"""
+    # Add webplayback scope for playback control
+    global sp
+    scope = "user-read-playback-state user-modify-playback-state user-read-currently-playing streaming playlist-read-private playlist-modify-private playlist-modify-public playlist-read-collaborative user-library-read user-library-modify user-follow-read user-follow-modify user-top-read user-read-email user-read-private"
     auth_url = (
         "https://accounts.spotify.com/authorize"
         "?response_type=code"
         f"&client_id={SPOTIFY_CLIENT_ID}"
         f"&redirect_uri={SPOTIFY_REDIRECT_URI}"
         f"&scope={scope}"
+        "&show_dialog=true"  # Force account selection screen
     )
     return redirect(auth_url)
 
-
-# Step 2: Callback URL Spotify redirects to after login
+# Step 2: Callback URL Spotify redirects to after login - moved back from auth.py
 @app.route("/callback")
 def callback():
-    global sp, active_device_id
+    """Handle callback from Spotify OAuth"""
+    global sp
     code = request.args.get("code")
     if not code:
-        return "Authorization failed", 400
+        return "Authorization failed: No code provided", 400
 
     token_url = "https://accounts.spotify.com/api/token"
     payload = {
@@ -70,88 +75,103 @@ def callback():
         "Content-Type": "application/x-www-form-urlencoded"
     }
 
-    response = requests.post(token_url, data=payload, headers=headers)
-
-    if response.status_code != 200:
-        return f"Token exchange failed: {response.text}", 500
-
-    tokens = response.json()
-    access_token = tokens["access_token"]
-
-    # Initialize the Spotify client with the access token
-    sp = Spotify(auth=access_token)
-    
-    # Verify Spotify client is initialized
     try:
+        response = requests.post(token_url, data=payload, headers=headers)
+        response.raise_for_status()  # This will raise an exception for 4XX/5XX responses
+        
+        tokens = response.json()
+        access_token = tokens["access_token"]
+        refresh_token = tokens.get("refresh_token")  # Store this for later use
+        
+        # Initialize the Spotify client with the access token
+        sp = Spotify(auth=access_token)
+        
+        # Verify Spotify client is initialized
         user_info = sp.current_user()
         print(f"Spotify client initialized successfully for user: {user_info.get('id', 'unknown')}")
-    except Exception as e:
-        print(f"Error initializing Spotify client: {e}")
-        return "Failed to initialize Spotify client", 500
-
-    # Set the active device
-    try:
-        devices = sp.devices()
-        available_devices = devices.get('devices', [])
-
-        if not available_devices:
-            print("No available Spotify devices found. Please open Spotify on a device.")
-            return "No active Spotify devices found. Please open Spotify on a device.", 400
-
-        # Prefer active devices, then the first available device
-        active_devices = [d for d in available_devices if d.get('is_active')]
-
-        if active_devices:
-            active_device_id = active_devices[0]['id']
-            print(f"Using currently active device: {active_devices[0]['name']} ({active_device_id})")
-        else:
-            active_device_id = available_devices[0]['id']
-            print(f"No active device, using first available: {available_devices[0]['name']} ({active_device_id})")
-
-        # Transfer playback to the active device
-        sp.transfer_playback(device_id=active_device_id, force_play=False)
-    except Exception as e:
-        print(f"Error setting active device: {e}")
-        return "Failed to set active Spotify device. Please ensure Spotify is open.", 500
-
-    # Return success page with token and auto-close script
-    success_html = f"""
-    <!DOCTYPE html>
-    <html>
-    <head>
-        <title>Spotify Authorization Successful</title>
-        <style>
-            body {{ font-family: Arial, sans-serif; text-align: center; padding: 40px; }}
-            .success {{ color: green; font-size: 24px; margin: 20px 0; }}
-            .info {{ font-size: 16px; margin: 20px 0; }}
-        </style>
-    </head>
-    <body>
-        <div class="success">Spotify Authorization Successful!</div>
-        <div class="info">You can close this tab and return to the Magic Mirror.</div>
         
-        <script>
-        try {{
-            localStorage.setItem('spotify_token', '{access_token}');
-            localStorage.setItem('spotify_token_timestamp', Date.now());
-            if (window.opener) {{
-                window.opener.postMessage({{ type: 'SPOTIFY_AUTH_SUCCESS', token: '{access_token}' }}, '*');
+        # Store tokens securely in session or database for server-side use
+        if refresh_token:
+            # Store refresh_token in a secure way - example only
+            # In production, use a secure database or encrypted storage
+            session['spotify_refresh_token'] = refresh_token
+        
+        # Return success page with token and auto-close script
+        success_html = f"""
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <title>Spotify Authorization Successful</title>
+            <style>
+                body {{ font-family: Arial, sans-serif; text-align: center; padding: 40px; }}
+                .success {{ color: green; font-size: 24px; margin: 20px 0; }}
+                .info {{ font-size: 16px; margin: 20px 0; }}
+            </style>
+        </head>
+        <body>
+            <div class="success">Spotify Authorization Successful!</div>
+            <div class="info">You can close this tab and return to the Magic Mirror.</div>
+            
+            <script>
+            try {{
+                // Store token with expiration info
+                localStorage.setItem('spotify_token', '{access_token}');
+                localStorage.setItem('spotify_token_timestamp', Date.now());
+                localStorage.setItem('spotify_token_expires_in', {tokens.get("expires_in", 3600)});
+                
+                // Notify opener window if it exists
+                if (window.opener) {{
+                    window.opener.postMessage({{ 
+                        type: 'SPOTIFY_AUTH_SUCCESS', 
+                        token: '{access_token}',
+                        expiresIn: {tokens.get("expires_in", 3600)} 
+                    }}, '*');
+                    
+                    // Close this window after a short delay
+                    setTimeout(() => window.close(), 3000);
+                }} else {{
+                    // If no opener, redirect back to the main app
+                    setTimeout(() => window.location.href = '/', 3000);
+                }}
+            }} catch(e) {{
+                console.error('Error storing token:', e);
+                document.body.innerHTML += '<div style="color:red">Error storing token. Please try again.</div>';
             }}
-            setTimeout(() => {{
-                window.close();
-            }}, 5000);
-        }} catch(e) {{
-            console.error('Error storing token:', e);
-        }}
-        </script>
-    </body>
-    </html>
-    """
-    
-    return success_html
-
-# Remove the global initialization of the Spotify client and devices fetching logic
-sp = None
+            </script>
+        </body>
+        </html>
+        """
+        
+        return success_html
+        
+    except requests.exceptions.RequestException as e:
+        print(f"Error during token exchange: {e}")
+        error_message = "Token exchange failed. Please try again."
+        if hasattr(e, 'response') and e.response is not None:
+            try:
+                error_data = e.response.json()
+                error_message = f"Spotify error: {error_data.get('error_description', error_data.get('error', 'Unknown error'))}"
+            except:
+                error_message = f"Token exchange failed: {e.response.status_code} - {e.response.text}"
+        
+        return f"""
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <title>Spotify Authorization Failed</title>
+            <style>
+                body {{ font-family: Arial, sans-serif; text-align: center; padding: 40px; }}
+                .error {{ color: red; font-size: 24px; margin: 20px 0; }}
+                .info {{ font-size: 16px; margin: 20px 0; }}
+            </style>
+        </head>
+        <body>
+            <div class="error">Spotify Authorization Failed</div>
+            <div class="info">{error_message}</div>
+            <button onclick="window.close()">Close</button>
+        </body>
+        </html>
+        """, 500
 
 # Add a route to fetch devices dynamically
 @app.route("/devices")
@@ -179,6 +199,110 @@ conversation_context = {
     'last_recommendation_query': None
 }
 
+def refresh_spotify_token(refresh_token):
+    """Helper function to refresh an expired Spotify token"""
+    global sp
+    try:
+        token_url = "https://accounts.spotify.com/api/token"
+        payload = {
+            "grant_type": "refresh_token",
+            "refresh_token": refresh_token,
+            "client_id": SPOTIFY_CLIENT_ID,
+            "client_secret": SPOTIFY_CLIENT_SECRET
+        }
+
+        headers = {
+            "Content-Type": "application/x-www-form-urlencoded"
+        }
+
+        response = requests.post(token_url, data=payload, headers=headers)
+        response.raise_for_status()
+        
+        tokens = response.json()
+        new_token = tokens["access_token"]
+        
+        # Update the Spotify client with the new token
+        if sp is not None:
+            sp.auth = new_token
+        else:
+            sp = Spotify(auth=new_token)
+            
+        return new_token
+    except Exception as e:
+        print(f"Error refreshing token: {e}")
+        return None
+
+@app.route('/get-spotify-token', methods=['GET'])
+def get_spotify_token():
+    """Return the current Spotify OAuth token to the frontend."""
+    global sp
+    try:
+        # Check if sp exists
+        if sp is None:
+            return jsonify({'error': 'Spotify client not initialized. Please login first.'}), 401
+            
+        # For direct auth flow
+        if hasattr(sp, 'auth'):
+            # Verify token is still valid by making a test request
+            try:
+                # Try a simple API call to check token validity
+                sp.current_user()
+                return jsonify({
+                    'token': sp.auth,
+                    'valid': True
+                })
+            except Exception as e:
+                # Token may be expired
+                print(f"Token validation error: {e}")
+                
+                # Try to refresh the token if we have a refresh token
+                if 'spotify_refresh_token' in session:
+                    try:
+                        new_token = refresh_spotify_token(session['spotify_refresh_token'])
+                        if new_token:
+                            sp.auth = new_token
+                            return jsonify({
+                                'token': new_token,
+                                'valid': True,
+                                'refreshed': True
+                            })
+                    except Exception as refresh_error:
+                        print(f"Token refresh error: {refresh_error}")
+                
+                return jsonify({
+                    'error': 'Token expired or invalid',
+                    'needs_reauth': True
+                }), 401
+            
+        # For SpotifyOAuth flow
+        elif hasattr(sp, 'auth_manager') and sp.auth_manager:
+            token_info = sp.auth_manager.get_cached_token()
+            if token_info and 'access_token' in token_info:
+                return jsonify({'token': token_info['access_token']})
+                
+        # No valid token found
+        return jsonify({'error': 'No valid token available'}), 401
+    except Exception as e:
+        print(f"Error retrieving Spotify token: {e}")
+        return jsonify({'error': f'Failed to retrieve token: {str(e)}'}), 500
+
+# Function to ensure Spotify is initialized before any operations
+def ensure_spotify_initialized():
+    global sp
+    if sp is None:
+        # Check if we have a refresh token to try
+        if 'spotify_refresh_token' in session:
+            try:
+                new_token = refresh_spotify_token(session['spotify_refresh_token'])
+                if new_token:
+                    sp = Spotify(auth=new_token)
+                    return True
+            except Exception as e:
+                print(f"Error initializing Spotify client: {e}")
+                return False
+        return False
+    return True
+
 def get_gemini_response(prompt):
     """Get AI-generated response from Google Gemini."""
     try:
@@ -190,7 +314,6 @@ def get_gemini_response(prompt):
     except Exception as e:
         print(f"Error with Gemini AI: {e}")
         return "{}"  # Return empty JSON object
-
 
 def extract_json_from_text(text):
     """Extract valid JSON from a text response."""
@@ -562,7 +685,7 @@ def ask_google_assistant(prompt):
 
 def get_similar_songs(song_name, artist=None, limit=5):
     """Get similar songs to a given track using Spotify recommendations."""
-    try {
+    try:
         # First search for the seed track
         query = f"track:{song_name}"
         if artist:
@@ -1023,7 +1146,12 @@ def analyze_request_intent(user_query):
 @app.route('/ask', methods=['POST'])
 def ask():
     """API endpoint to process user queries with AI-driven intent recognition."""
-    global conversation_context
+    global conversation_context, sp
+    
+    # Check if Spotify is initialized
+    spotify_available = ensure_spotify_initialized()
+    if not spotify_available:
+        print("Warning: Spotify client is not initialized. Some features may not work.")
     
     data = request.get_json()
     if 'query' not in data:
@@ -1037,7 +1165,7 @@ def ask():
     intent = request_analysis.get("intent", "general")
     
     # Handle different types of intents
-    if intent == "music":
+    if intent == "music" and spotify_available:
         sub_intent = request_analysis.get("sub_intent", "unknown")
         
         if sub_intent == "play":
@@ -1058,40 +1186,44 @@ def ask():
                 if artist:
                     query += f" {artist}"
                     
-                results = sp.search(q=query, type='track', limit=3)
-                
-                if results["tracks"]["items"]:
-                    tracks = results["tracks"]["items"]
+                try:
+                    results = sp.search(q=query, type='track', limit=3)
                     
-                    # If we found exactly one match or an exact match, play it directly
-                    if len(tracks) == 1 or (song_name.lower() in tracks[0]["name"].lower()):
-                        track = tracks[0]
-                        success = play_on_active_device(uris=[track["uri"]])
-                        if success:
-                            response_text = f"Playing \"{track['name']}\" by {track['artists'][0]['name']}."
+                    if results["tracks"]["items"]:
+                        tracks = results["tracks"]["items"]
+                        
+                        # If we found exactly one match or an exact match, play it directly
+                        if len(tracks) == 1 or (song_name.lower() in tracks[0]["name"].lower()):
+                            track = tracks[0]
+                            success = play_on_active_device(uris=[track["uri"]])
+                            if success:
+                                response_text = f"Playing \"{track['name']}\" by {track['artists'][0]['name']}."
+                            else:
+                                response_text = "I found the song but couldn't play it. Please make sure Spotify is open."
                         else:
-                            response_text = "I found the song but couldn't play it. Please make sure Spotify is open."
+                            # Store the tracks as options
+                            conversation_context['last_suggested_songs'] = [
+                                {
+                                    'name': track['name'],
+                                    'artist': track['artists'][0]['name'],
+                                    'uri': track['uri'],
+                                    'id': track['id']
+                                }
+                                for track in tracks
+                            ]
+                            
+                            # Format options for display
+                            options_text = "I found these songs matching your request:\n"
+                            for i, track in enumerate(tracks, 1):
+                                options_text += f"{i}. \"{track['name']}\" by {track['artists'][0]['name']}\n"
+                            
+                            options_text += "\nWhich one would you like me to play?"
+                            response_text = options_text
                     else:
-                        # Store the tracks as options
-                        conversation_context['last_suggested_songs'] = [
-                            {
-                                'name': track['name'],
-                                'artist': track['artists'][0]['name'],
-                                'uri': track['uri'],
-                                'id': track['id']
-                            }
-                            for track in tracks
-                        ]
-                        
-                        # Format options for display
-                        options_text = "I found these songs matching your request:\n"
-                        for i, track in enumerate(tracks, 1):
-                            options_text += f"{i}. \"{track['name']}\" by {track['artists'][0]['name']}\n"
-                        
-                        options_text += "\nWhich one would you like me to play?"
-                        response_text = options_text
-                else:
-                    response_text = f"Sorry, I couldn't find a song matching \"{song_name}\" on Spotify."
+                        response_text = f"Sorry, I couldn't find a song matching \"{song_name}\" on Spotify."
+                except Exception as e:
+                    print(f"Error searching Spotify: {e}")
+                    response_text = "I'm having trouble with Spotify right now. Please make sure you're logged in."
             else:
                 # Generic play request without specific song
                 # Check if we should use the last suggested songs
@@ -1100,6 +1232,7 @@ def ask():
                 else:
                     response_text = "I'm not sure which song you'd like me to play. Could you specify a song or artist?"
         
+        # ...rest of the music handling logic...
         elif sub_intent == "suggest":
             # Update conversation context with suggestion details
             if request_analysis.get("reference_song"):
@@ -1158,6 +1291,9 @@ def ask():
                 # For other music query types, get AI to generate a response
                 response_text = get_ai_response_for_music_query(user_query)
     
+    elif intent == "music" and not spotify_available:
+        response_text = "I'd love to play some music for you, but you need to log in to Spotify first. Try saying 'login to spotify'."
+    
     else:  # intent == "general" or any other case
         # This is a general query, use the Google Assistant for a response
         response_text = ask_google_assistant(user_query)
@@ -1168,42 +1304,136 @@ def ask():
     # Return the response
     return jsonify({'response': response_text, 'history': list(message_history)})
 
-# Add these new endpoints
-
-@app.route('/get-spotify-token', methods=['GET'])
-def get_spotify_token():
-    """Return the current Spotify OAuth token to the frontend."""
-    try:
-        # Get the current token from SpotifyOAuth
-        token_info = sp.auth_manager.get_cached_token()
-        if token_info and 'access_token' in token_info:
-            return jsonify({'token': token_info['access_token']})
-        return jsonify({'error': 'No token available'}), 400
-    except Exception as e:
-        print(f"Error retrieving Spotify token: {e}")
-        return jsonify({'error': 'Failed to retrieve token'}), 500
-
 @app.route('/set-active-device', methods=['POST'])
 def set_active_device():
-    """Set the active Spotify device ID."""
-    global active_device_id
+    """Set the active Spotify device ID and immediately attempt to transfer playback."""
+    global sp, active_device_id
+    
+    if not sp:
+        return jsonify({'error': 'Not authenticated with Spotify'}), 401
     
     data = request.get_json()
     if 'device_id' not in data:
         return jsonify({'error': 'device_id is required'}), 400
     
-    active_device_id = data['device_id']
+    device_id = data['device_id']
+    active_device_id = device_id
     print(f"Set active Spotify device ID to: {active_device_id}")
     
-    # Try to transfer playback to this device
+    # Validate device exists first
     try:
-        sp.transfer_playback(device_id=active_device_id, force_play=False)
-        print(f"Successfully transferred playback to device: {active_device_id}")
+        devices = sp.devices()
+        device_exists = False
+        for device in devices.get('devices', []):
+            if device['id'] == device_id:
+                device_exists = True
+                print(f"Found device: {device['name']} (ID: {device_id})")
+                break
+                
+        if not device_exists:
+            print(f"Device ID {device_id} not found in available devices, but will attempt transfer anyway")
     except Exception as e:
-        print(f"Note: Could not transfer playback (this is normal if no music is playing): {e}")
+        print(f"Error checking devices: {e}")
     
-    return jsonify({'success': True})
-
+    # Try to transfer playback to this device with retry logic
+    max_retries = 3
+    retry_delay = 2  # seconds
+    success = False
+    error_message = None
+    
+    for attempt in range(max_retries):
+        try:
+            sp.transfer_playback(device_id=active_device_id, force_play=False)
+            print(f"Successfully transferred playback to device: {active_device_id}")
+            success = True
+            break
+        except Exception as e:
+            error_message = str(e)
+            print(f"Attempt {attempt+1}/{max_retries}: Could not transfer playback: {e}")
+            if attempt < max_retries - 1:
+                print(f"Waiting {retry_delay} seconds before retrying...")
+                import time
+                time.sleep(retry_delay)
+                retry_delay *= 2  # Exponential backoff
+    
+    # Try a direct API call if spotipy transfer failed
+    if not success:
+        try:
+            # Refresh the token if needed
+            if hasattr(sp, '_auth'):
+                token = sp._auth
+            else:
+                token = sp.auth
+            
+            # Make direct API call
+            response = requests.put(
+                'https://api.spotify.com/v1/me/player',
+                headers={
+                    'Authorization': f'Bearer {token}',
+                    'Content-Type': 'application/json'
+                },
+                json={
+                    'device_ids': [active_device_id],
+                    'play': False
+                }
+            )
+            
+            if response.status_code in (204, 200):
+                print(f"Successfully transferred playback via direct API call")
+                success = True
+                error_message = None
+            else:
+                print(f"Direct API transfer failed with status {response.status_code}: {response.text}")
+                try:
+                    error_data = response.json()
+                    error_message = f"API Error: {error_data.get('error', {}).get('message', 'Unknown error')}"
+                except:
+                    error_message = f"Status code {response.status_code}: {response.text}"
+        except Exception as e:
+            print(f"Error in direct API transfer: {e}")
+            error_message = str(e)
+    
+    # Start monitor thread in the background
+    import threading
+    def monitor_device():
+        import time
+        count = 0
+        while count < 10:  # Check for 10 times (50 seconds)
+            time.sleep(5)  # Check every 5 seconds
+            try:
+                devices = sp.devices()
+                print(f"Device check {count+1}/10: Found {len(devices.get('devices', []))} devices")
+                for device in devices.get('devices', []):
+                    if device['id'] == active_device_id:
+                        print(f"Confirmed device is available: {device['name']} (ID: {device['id']})")
+                        # Try to make it active if it's not
+                        if not device.get('is_active'):
+                            try:
+                                sp.transfer_playback(device_id=active_device_id, force_play=False)
+                                print("Set as active device")
+                            except Exception as e:
+                                print(f"Could not set as active: {e}")
+                        return  # Device found and confirmed, exit thread
+                
+                # If we're here, device wasn't found in the list
+                print(f"Device {active_device_id} not found in available devices")
+                
+            except Exception as e:
+                print(f"Error checking devices: {e}")
+            
+            count += 1
+    
+    # Start the monitoring thread
+    monitor_thread = threading.Thread(target=monitor_device)
+    monitor_thread.daemon = True
+    monitor_thread.start()
+    
+    return jsonify({
+        'success': success, 
+        'device_id': active_device_id,
+        'error': error_message if not success else None
+    })
+    
 @app.route('/api/data', methods=['GET'])
 def get_data():
     """API endpoint to provide general data for the mirror display."""
@@ -1363,6 +1593,6 @@ def home():
     """
 
 if __name__ == "__main__":
-    app.run(host='0.0.0.0', port=5000)
+    app.run(debug=True, host='0.0.0.0', port=5000)
 
 # handler = app
