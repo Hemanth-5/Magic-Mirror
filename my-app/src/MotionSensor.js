@@ -13,17 +13,7 @@ const MotionSensor = ({ onPresenceChange }) => {
   const REQUIRED_ABSENCE_COUNT = 2; // Need this many consecutive absence detections
   
   useEffect(() => {
-    // Check if running on Vercel
-    const isVercelEnv = window.location.hostname.includes('vercel.app');
     let intervalId = null;
-    
-    // If we're on Vercel, just simulate presence and don't try to contact hardware
-    if (isVercelEnv) {
-      console.log('Running on Vercel - skipping motion detection');
-      setIsPresent(true);
-      onPresenceChange(true);
-      return () => {}; // Empty cleanup function
-    }
     
     const checkDistance = async () => {
       try {

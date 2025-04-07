@@ -43,6 +43,8 @@ def login():
     # Add webplayback scope for playback control
     global sp
     scope = "user-read-playback-state user-modify-playback-state user-read-currently-playing streaming playlist-read-private playlist-modify-private playlist-modify-public playlist-read-collaborative user-library-read user-library-modify user-follow-read user-follow-modify user-top-read user-read-email user-read-private"
+    # Play, pause, next, previous scopes
+    scope += " user-read-playback-position user-read-playback-state user-modify-playback-state"
     auth_url = (
         "https://accounts.spotify.com/authorize"
         "?response_type=code"
