@@ -12,6 +12,16 @@ try:
 except (ImportError, RuntimeError):
     IS_PI = False
 
+try:
+    import adafruit_dht
+    import board
+    dht_sensor = adafruit_dht.DHT11(board.D4)  # Or use DHT22
+    HAS_DHT = True
+except (ImportError, RuntimeError, AttributeError) as e:
+    print("[WARNING] DHT sensor not available:", e)
+    HAS_DHT = False
+
+
 app = Flask(__name__)
 CORS(app, origin='*')  # Enable CORS for all routes
 
@@ -60,6 +70,20 @@ def turn_on_screen():
     if IS_PI:
         os.system("vcgencmd display_power 1")
     print("👀 Screen ON command sent")
+
+@app.route('/dht', methods=['GET'])
+def get_temp_humidity():
+    if not HAS_DHT:
+        return jsonify({'error': 'DHT sensor not available'}), 500
+    try:
+        temperature = dht_sensor.temperature
+        humidity = dht_sensor.humidity
+        if temperature is None or humidity is None:
+            raise ValueError("Sensor reading is None")
+        return jsonify({'temperature': temperature, 'humidity': humidity})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
 
 @app.route('/distance', methods=['GET'])
 def distance():
@@ -102,6 +126,16 @@ try:
 except (ImportError, RuntimeError):
     IS_PI = False
 
+try:
+    import adafruit_dht
+    import board
+    dht_sensor = adafruit_dht.DHT11(board.D4)  # Or use DHT22
+    HAS_DHT = True
+except (ImportError, RuntimeError, AttributeError) as e:
+    print("[WARNING] DHT sensor not available:", e)
+    HAS_DHT = False
+
+
 app = Flask(__name__)
 CORS(app, origin='*')  # Enable CORS for all routes
 
@@ -151,6 +185,20 @@ def turn_on_screen():
         os.system("vcgencmd display_power 1")
     print("👀 Screen ON command sent")
 
+@app.route('/dht', methods=['GET'])
+def get_temp_humidity():
+    if not HAS_DHT:
+        return jsonify({'error': 'DHT sensor not available'}), 500
+    try:
+        temperature = dht_sensor.temperature
+        humidity = dht_sensor.humidity
+        if temperature is None or humidity is None:
+            raise ValueError("Sensor reading is None")
+        return jsonify({'temperature': temperature, 'humidity': humidity})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
 @app.route('/distance', methods=['GET'])
 def distance():
     try:
@@ -176,10 +224,6 @@ def control_screen():
         return jsonify({"status": "success", "action": action})
     except Exception as e:
         return jsonify({'error': str(e)}), 500
-
-@app.route('/')
-def home():
-    return "✅ Hardware server running on Raspberry Pi"
 """
 
 @app.route('/')

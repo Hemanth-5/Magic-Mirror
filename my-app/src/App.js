@@ -7,7 +7,6 @@ import { handleSpotifyCallback } from './utils/SpotifyAuth';
 const App = () => {
   const [time, setTime] = useState("--:--:--");
   const [date, setDate] = useState("--/--/----");
-  const [weatherTemp, setWeatherTemp] = useState("--°C");
   const [sensorTemp, setSensorTemp] = useState("--°C");
   const [inputText, setInputText] = useState("");
   const [speechText, setSpeechText] = useState("");
@@ -51,14 +50,19 @@ const App = () => {
     setDate(now.toLocaleDateString());
   };
 
-  const getWeather = () => {
-    const temp = Math.floor(Math.random() * 10 + 20);
-    setWeatherTemp(`${temp}°C`);
-  };
-
-  const getSensorTemp = () => {
-    const sensorTemp = Math.floor(Math.random() * 5 + 25);
-    setSensorTemp(`${sensorTemp}°C`);
+  const getSensorTemp = async () => {
+    try {
+      const res = await fetch('http://<raspberry-pi-ip>:5001/dht');
+      const data = await res.json();
+      if (data?.temperature) {
+        setSensorTemp(`${data.temperature}°C (${data.humidity}%)`);
+      } else {
+        setSensorTemp("N/A");
+      }
+    } catch (error) {
+      console.error("Error fetching sensor temperature:", error);
+      setSensorTemp("N/A");
+    }
   };
 
   const speak = (text) => {
@@ -426,7 +430,6 @@ const App = () => {
           <canvas ref={canvasRef} width="100" height="100"></canvas>
           <div className="date">{date}</div>
           <div className="weather-temp">
-            <div>{weatherTemp}</div>
             <div>{sensorTemp}</div>
           </div>
           {/* {isVercel && (
