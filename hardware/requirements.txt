@@ -1,0 +1,3 @@
+Flask>=2.0.0
+Flask-Cors>=3.0.0
+RPi.GPIO>=0.7.0  # Only needed on Raspberry Pi systems

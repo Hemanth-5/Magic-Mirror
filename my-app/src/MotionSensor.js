@@ -57,6 +57,7 @@ const MotionSensor = ({ onPresenceChange }) => {
             handlePresenceChange(true);
           }
         } else {
+
           consistentAbsenceCountRef.current++;
           console.log(`🤷 No presence (${consistentAbsenceCountRef.current}/${REQUIRED_ABSENCE_COUNT})`);
   
@@ -94,8 +95,7 @@ const MotionSensor = ({ onPresenceChange }) => {
     color: 'white',
     padding: '5px',
     borderRadius: '5px',
-    fontSize: '12px',
-    display: process.env.NODE_ENV === 'development' ? 'block' : 'none',
+    fontSize: '12px'
   };
 
   return (
