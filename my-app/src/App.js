@@ -52,7 +52,7 @@ const App = () => {
 
   const getSensorTemp = async () => {
     try {
-      const res = await fetch('http://<raspberry-pi-ip>:5001/dht');
+      const res = await fetch(`${HARDWARE_SERVER_URL}/dht`);
       const data = await res.json();
       if (data?.temperature) {
         setSensorTemp(`${data.temperature}°C (${data.humidity}%)`);
