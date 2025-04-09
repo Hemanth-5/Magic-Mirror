@@ -235,12 +235,10 @@ const App = () => {
 
   useEffect(() => {
     const timeInterval = setInterval(updateTime, 1000);
-    const weatherInterval = setInterval(getWeather, 10000);
     const sensorInterval = setInterval(getSensorTemp, 10000);
 
     return () => {
       clearInterval(timeInterval);
-      clearInterval(weatherInterval);
       clearInterval(sensorInterval);
     };
   }, []);
